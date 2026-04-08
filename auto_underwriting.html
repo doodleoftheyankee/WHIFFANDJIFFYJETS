@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auto Loan Underwriting System — RouteOne / CUDL Desk Tool</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0e1a;color:#e0e0e0;min-height:100vh}
+.container{max-width:1300px;margin:0 auto;padding:20px}
+h1{text-align:center;color:#00d4ff;font-size:1.8em;margin:20px 0 5px;text-transform:uppercase;letter-spacing:3px}
+.subtitle{text-align:center;color:#7a8ba8;margin-bottom:30px;font-size:0.95em}
+.panel{background:#111827;border:1px solid #1e3a5f;border-radius:12px;padding:24px;margin-bottom:20px}
+.panel h2{color:#00d4ff;font-size:1.3em;margin-bottom:16px;border-bottom:1px solid #1e3a5f;padding-bottom:8px}
+.panel h3{color:#60a5fa;font-size:1.05em;margin:16px 0 10px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column}
+.form-group label{font-size:0.82em;color:#93a3b8;margin-bottom:4px;font-weight:500}
+.form-group input,.form-group select{background:#1a2332;border:1px solid #2d4a6f;color:#e0e0e0;padding:10px 12px;border-radius:8px;font-size:0.95em;outline:none;transition:border-color 0.2s}
+.form-group input:focus,.form-group select:focus{border-color:#00d4ff}
+.btn{background:linear-gradient(135deg,#0066ff,#00d4ff);color:#fff;border:none;padding:16px 40px;font-size:1.15em;font-weight:700;border-radius:10px;cursor:pointer;display:block;width:100%;margin:24px 0;text-transform:uppercase;letter-spacing:2px;transition:transform 0.15s,box-shadow 0.15s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 25px rgba(0,212,255,0.35)}
+#results{display:none}
+.rec-badge{display:inline-block;padding:10px 24px;border-radius:8px;font-weight:700;font-size:1.15em;letter-spacing:1px}
+.rec-autoapprove{background:#065f46;color:#34d399;border:2px solid #34d399}
+.rec-conditional{background:#78350f;color:#fbbf24;border:2px solid #fbbf24}
+.rec-counter{background:#4a2c0a;color:#f59e0b;border:2px solid #f59e0b}
+.rec-turndown{background:#7f1d1d;color:#f87171;border:2px solid #f87171}
+.metrics-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+.metric-card{background:#1a2332;border-radius:10px;padding:14px;text-align:center;border:1px solid #1e3a5f}
+.metric-card .val{font-size:1.6em;font-weight:700;margin:4px 0}
+.metric-card .lbl{font-size:0.75em;color:#7a8ba8;text-transform:uppercase;letter-spacing:1px}
+.val-good{color:#34d399}.val-warn{color:#fbbf24}.val-bad{color:#f87171}
+.bar-container{background:#1a2332;border-radius:6px;height:22px;overflow:hidden;margin:4px 0}
+.bar-fill{height:100%;border-radius:6px;transition:width 0.5s}
+.bar-good{background:linear-gradient(90deg,#059669,#34d399)}.bar-warn{background:linear-gradient(90deg,#d97706,#fbbf24)}.bar-bad{background:linear-gradient(90deg,#dc2626,#f87171)}
+.factor-row{background:#0d1520;border-radius:8px;padding:14px;margin:8px 0;border-left:4px solid #1e3a5f}
+.factor-row.risk-low{border-left-color:#34d399}.factor-row.risk-mod{border-left-color:#fbbf24}.factor-row.risk-high{border-left-color:#f87171}.factor-row.risk-vhigh{border-left-color:#ff0040}
+.factor-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.factor-name{font-weight:600;color:#e0e0e0;font-size:0.95em}
+.factor-score{font-weight:700;font-size:0.9em}
+.factor-value{font-size:0.82em;color:#93a3b8;margin-bottom:6px}
+.factor-explanation{font-size:0.82em;color:#7a8ba8;margin:6px 0}
+.action-item{font-size:0.85em;color:#fbbf24;padding:4px 0 4px 18px;position:relative}
+.action-item::before{content:"\2192";position:absolute;left:0}
+.comp-factor{color:#34d399;font-size:0.88em;padding:3px 0 3px 18px;position:relative}
+.comp-factor::before{content:"+";position:absolute;left:2px;font-weight:700}
+.risk-flag{color:#f87171;font-size:0.88em;padding:3px 0 3px 18px;position:relative}
+.risk-flag::before{content:"!";position:absolute;left:3px;font-weight:700}
+.bank-card{background:#0d1520;border-radius:8px;padding:16px;margin:8px 0;border:1px solid #1e3a5f}
+.bank-card.bank-match{border-color:#059669}.bank-card.bank-maybe{border-color:#d97706}.bank-card.bank-no{border-color:#7f1d1d}
+.bank-card .bk-name{font-weight:700;font-size:1.05em}
+.bank-card .bk-status{float:right;font-weight:600;font-size:0.85em}
+.bk-yes{color:#34d399}.bk-maybe{color:#fbbf24}.bk-no{color:#f87171}
+.bank-card .bk-detail{font-size:0.82em;color:#93a3b8;margin:4px 0}
+.bank-card .bk-tip{color:#60a5fa;font-size:0.82em;padding-left:14px}
+.scenario-card{background:#0d1520;border-radius:8px;padding:14px;margin:8px 0;border:1px solid #1e3a5f}
+.scenario-card .sc-name{font-weight:600;color:#60a5fa;font-size:0.95em}
+.scenario-card .sc-desc{font-size:0.85em;color:#93a3b8;margin:4px 0}
+.scenario-card .sc-impact{font-size:0.9em;font-weight:600;color:#34d399;margin-top:4px}
+.note-line{font-size:0.88em;color:#93a3b8;padding:3px 0 3px 10px}
+.section-divider{border:none;border-top:1px solid #1e3a5f;margin:16px 0}
+.stip-item{background:#1a1a2e;border-left:3px solid #fbbf24;padding:8px 12px;margin:4px 0;border-radius:0 6px 6px 0;font-size:0.88em;color:#fbbf24}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:768px){.form-grid,.two-col{grid-template-columns:1fr}.form-grid-2{grid-template-columns:1fr}.metrics-row{grid-template-columns:1fr 1fr}}
+.guideline-table{width:100%;border-collapse:collapse;font-size:0.85em;margin:8px 0}
+.guideline-table th{text-align:left;color:#60a5fa;padding:6px 10px;border-bottom:1px solid #1e3a5f}
+.guideline-table td{padding:6px 10px;border-bottom:1px solid #0d1520;color:#93a3b8}
+.guideline-table td:first-child{color:#e0e0e0;font-weight:500;width:40%}
+.desk-box{background:#0f172a;border:2px solid #00d4ff;border-radius:12px;padding:20px;margin:16px 0}
+.desk-box h3{color:#00d4ff;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Auto Loan Desk Tool</h1>
+<p class="subtitle">RouteOne / CUDL Underwriting Analyzer &bull; Deal Structure Optimizer &bull; Bank Matching</p>
+
+<div class="panel" id="inputPanel">
+<h2>Deal Information</h2>
+
+<h3>Customer Credit</h3>
+<div class="form-grid">
+<div class="form-group"><label>Credit Score (FICO Auto / Beacon)</label><input type="number" id="creditScore" value="665" min="300" max="850"></div>
+<div class="form-group"><label>Co-Signer Credit Score (0 if none)</label><input type="number" id="coCreditScore" value="0" min="0" max="850"></div>
+<div class="form-group"><label>Bankruptcy? (months ago, 999=never)</label><input type="number" id="bkMonths" value="999" min="0"></div>
+<div class="form-group"><label>Repo? (months ago, 999=never)</label><input type="number" id="repoMonths" value="999" min="0"></div>
+<div class="form-group"><label>Open Auto Tradelines (current/past)</label><input type="number" id="autoTradelines" value="2" min="0"></div>
+<div class="form-group"><label>Total Open Tradelines</label><input type="number" id="totalTradelines" value="6" min="0"></div>
+<div class="form-group"><label>Late Payments (last 12 months)</label><input type="number" id="lates12" value="0" min="0"></div>
+<div class="form-group"><label>Collections/Charge-offs (count)</label><input type="number" id="collectionsCount" value="0" min="0"></div>
+<div class="form-group"><label>Current Auto Loan? (months paid)</label><input type="number" id="currentAutoMonths" value="0" min="0"></div>
+</div>
+
+<h3>Income &amp; Stability</h3>
+<div class="form-grid">
+<div class="form-group"><label>Monthly Gross Income $</label><input type="number" id="monthlyIncome" value="4500" min="0" step="100"></div>
+<div class="form-group"><label>Co-Signer Monthly Income $ (0 if none)</label><input type="number" id="coIncome" value="0" min="0" step="100"></div>
+<div class="form-group"><label>Months at Current Job</label><input type="number" id="jobMonths" value="18" min="0"></div>
+<div class="form-group"><label>Months at Current Residence</label><input type="number" id="resMonths" value="24" min="0"></div>
+<div class="form-group"><label>Housing: Rent/Mortgage Payment $/mo</label><input type="number" id="housingPayment" value="1200" min="0" step="50"></div>
+<div class="form-group"><label>Income Type</label><select id="incomeType"><option value="w2" selected>W-2 Employee</option><option value="1099">1099 / Self-Employed</option><option value="ssi">SSI / Disability / Pension</option><option value="cash">Cash Income / Tips</option></select></div>
+</div>
+
+<h3>Existing Monthly Debts (besides housing)</h3>
+<div class="form-grid">
+<div class="form-group"><label>Other Monthly Debt Payments $ (cards, loans, child support, etc)</label><input type="number" id="otherDebts" value="350" min="0" step="50"></div>
+</div>
+
+<h3>Vehicle Information</h3>
+<div class="form-grid">
+<div class="form-group"><label>New or Used?</label><select id="newUsed"><option value="new">New</option><option value="used" selected>Used</option><option value="cpo">Certified Pre-Owned (CPO)</option></select></div>
+<div class="form-group"><label>Vehicle Year</label><input type="number" id="vehYear" value="2022" min="2000" max="2027"></div>
+<div class="form-group"><label>Vehicle Mileage</label><input type="number" id="vehMileage" value="32000" min="0" step="1000"></div>
+<div class="form-group"><label>Selling Price $</label><input type="number" id="sellingPrice" value="28000" min="0" step="500"></div>
+<div class="form-group"><label>Book Value (NADA/KBB Clean Trade) $</label><input type="number" id="bookValue" value="25500" min="0" step="500"></div>
+<div class="form-group"><label>Invoice / Dealer Cost $ (new only, 0 if used)</label><input type="number" id="invoice" value="0" min="0" step="500"></div>
+</div>
+
+<h3>Deal Structure</h3>
+<div class="form-grid">
+<div class="form-group"><label>Cash Down $</label><input type="number" id="cashDown" value="2000" min="0" step="250"></div>
+<div class="form-group"><label>Trade-in Value $</label><input type="number" id="tradeValue" value="0" min="0" step="500"></div>
+<div class="form-group"><label>Trade Payoff (amount owed) $</label><input type="number" id="tradePayoff" value="0" min="0" step="500"></div>
+<div class="form-group"><label>Rebates / Incentives $</label><input type="number" id="rebates" value="0" min="0" step="250"></div>
+<div class="form-group"><label>Tax Rate %</label><input type="number" id="taxRate" value="7" min="0" max="15" step="0.25"></div>
+<div class="form-group"><label>Doc Fee + Title/Reg Fees $</label><input type="number" id="fees" value="599" min="0" step="50"></div>
+<div class="form-group"><label>Desired Term (months)</label><select id="term"><option value="36">36 months</option><option value="48">48 months</option><option value="60">60 months</option><option value="72" selected>72 months</option><option value="84">84 months</option></select></div>
+<div class="form-group"><label>Buy Rate % (from rate sheet, 0=auto)</label><input type="number" id="buyRate" value="0" min="0" max="30" step="0.25"></div>
+<div class="form-group"><label>Desired Rate Markup (dealer reserve) %</label><input type="number" id="markup" value="2" min="0" max="5" step="0.25"></div>
+</div>
+
+<h3>Backend Products (added to amount financed)</h3>
+<div class="form-grid">
+<div class="form-group"><label>Extended Warranty $</label><input type="number" id="warranty" value="2500" min="0" step="100"></div>
+<div class="form-group"><label>GAP Insurance $</label><input type="number" id="gap" value="895" min="0" step="50"></div>
+<div class="form-group"><label>Other Backend (Paint/Fabric/Tire/etc) $</label><input type="number" id="otherBackend" value="0" min="0" step="100"></div>
+</div>
+
+<button class="btn" onclick="runAnalysis()">ANALYZE DEAL &amp; FIND BANKS</button>
+</div>
+
+<div id="results"></div>
+</div>
+<script>
+// ===================== AUTO LENDING SCORING ENGINE =====================
+
+// Credit tier definitions for auto lending
+const AUTO_CREDIT_TIERS = [
+  {min:780,max:850,label:"Super Prime",buyRate:4.5,maxAdv:130,maxTerm:84,approvalOdds:98},
+  {min:740,max:779,label:"Prime Plus",buyRate:5.5,maxAdv:125,maxTerm:84,approvalOdds:95},
+  {min:700,max:739,label:"Prime",buyRate:6.5,maxAdv:120,maxTerm:75,approvalOdds:92},
+  {min:680,max:699,label:"Near Prime",buyRate:7.9,maxAdv:115,maxTerm:72,approvalOdds:85},
+  {min:660,max:679,label:"Non-Prime A",buyRate:9.5,maxAdv:110,maxTerm:72,approvalOdds:75},
+  {min:640,max:659,label:"Non-Prime B",buyRate:11.9,maxAdv:105,maxTerm:66,approvalOdds:65},
+  {min:620,max:639,label:"Sub-Prime A",buyRate:14.5,maxAdv:100,maxTerm:66,approvalOdds:55},
+  {min:600,max:619,label:"Sub-Prime B",buyRate:17.9,maxAdv:95,maxTerm:60,approvalOdds:45},
+  {min:560,max:599,label:"Deep Sub-Prime",buyRate:21.0,maxAdv:90,maxTerm:60,approvalOdds:30},
+  {min:500,max:559,label:"Special Finance",buyRate:24.0,maxAdv:85,maxTerm:48,approvalOdds:15},
+  {min:300,max:499,label:"BHPH Territory",buyRate:28.0,maxAdv:80,maxTerm:36,approvalOdds:5}
+];
+
+// Bank/lender profiles (generic representations of typical lender types)
+const LENDER_PROFILES = [
+  {name:"Tier 1 Credit Union (via CUDL)",type:"credit_union",minFico:640,maxDTI:45,maxPTI:18,maxAdv:120,maxTerm:84,
+   maxAge:7,maxMiles:120000,rateFloor:4.0,notes:"Best rates, strict on advance. Run through CUDL.",strengths:["Lowest rates","Member-friendly"],weaknesses:["Strict LTV/advance","May need membership"]},
+  {name:"Tier 2 Credit Union (via CUDL)",type:"credit_union",minFico:580,maxDTI:50,maxPTI:20,maxAdv:115,maxTerm:78,
+   maxAge:10,maxMiles:150000,rateFloor:6.0,notes:"More flexible CU, still good rates.",strengths:["Good rates for lower FICO","More flexible advance"],weaknesses:["Stricter stips","Slower funding"]},
+  {name:"National Bank (Chase/BoA/Cap One via RouteOne)",type:"national_bank",minFico:620,maxDTI:50,maxPTI:20,maxAdv:125,maxTerm:84,
+   maxAge:8,maxMiles:120000,rateFloor:5.5,notes:"High volume, fast decisions. Submit through RouteOne.",strengths:["Fast auto-approvals","High advance on prime","Consistent guidelines"],weaknesses:["Rate not as low as CU","Strict on stips"]},
+  {name:"Captive Finance (Ford Motor Credit/Ally/GM Financial)",type:"captive",minFico:600,maxDTI:55,maxPTI:22,maxAdv:135,maxTerm:84,
+   maxAge:999,maxMiles:999999,rateFloor:0.0,notes:"Best for new vehicles from matching brand. Subvented rates available.",strengths:["Highest advance allowed","Subvented rates on new","Flexible on backend"],weaknesses:["Only for matching brand (new)","Higher rates on used"]},
+  {name:"Non-Prime Lender (Westlake/Capital One Auto/Exeter)",type:"nonprime",minFico:550,maxDTI:55,maxPTI:22,maxAdv:110,maxTerm:72,
+   maxAge:10,maxMiles:150000,rateFloor:9.0,notes:"Takes deals banks won't. Higher rate but gets it done.",strengths:["Lower FICO accepted","Flexible on income proof","Fast decisions"],weaknesses:["Higher rates","Stip-heavy","Lower max advance"]},
+  {name:"Sub-Prime Lender (DriveTime/Byrider/CAC/Santander Deep)",type:"subprime",minFico:450,maxDTI:60,maxPTI:25,maxAdv:100,maxTerm:66,
+   maxAge:12,maxMiles:175000,rateFloor:15.0,notes:"Special finance. Big down needed, shorter terms.",strengths:["Takes 450+ FICO","Works with BK/repo","Cash income sometimes OK"],weaknesses:["High rates","Big cash down required","GPS/starter interrupt may be required"]},
+  {name:"BHPH / In-House",type:"bhph",minFico:0,maxDTI:999,maxPTI:30,maxAdv:90,maxTerm:48,
+   maxAge:15,maxMiles:200000,rateFloor:20.0,notes:"Last resort. In-house financing, no bank needed.",strengths:["No credit minimum","Immediate approval","Flexible"],weaknesses:["Highest rates","Limited vehicle selection","Weekly payments common"]}
+];
+
+function getInputs(){
+  const g=id=>parseFloat(document.getElementById(id).value)||0;
+  const v=id=>document.getElementById(id).value;
+  let d={};
+  d.creditScore=g('creditScore');d.coCreditScore=g('coCreditScore');
+  d.bkMonths=g('bkMonths');d.repoMonths=g('repoMonths');
+  d.autoTradelines=g('autoTradelines');d.totalTradelines=g('totalTradelines');
+  d.lates12=g('lates12');d.collectionsCount=g('collectionsCount');
+  d.currentAutoMonths=g('currentAutoMonths');
+  d.monthlyIncome=g('monthlyIncome');d.coIncome=g('coIncome');
+  d.jobMonths=g('jobMonths');d.resMonths=g('resMonths');
+  d.housingPayment=g('housingPayment');d.incomeType=v('incomeType');
+  d.otherDebts=g('otherDebts');
+  d.newUsed=v('newUsed');d.vehYear=g('vehYear');d.vehMileage=g('vehMileage');
+  d.sellingPrice=g('sellingPrice');d.bookValue=g('bookValue');d.invoice=g('invoice');
+  d.cashDown=g('cashDown');d.tradeValue=g('tradeValue');d.tradePayoff=g('tradePayoff');
+  d.rebates=g('rebates');d.taxRate=g('taxRate');d.fees=g('fees');
+  d.term=parseInt(v('term'));d.buyRate=g('buyRate');d.markup=g('markup');
+  d.warranty=g('warranty');d.gap=g('gap');d.otherBackend=g('otherBackend');
+
+  // Calculated fields
+  d.totalIncome=d.monthlyIncome+d.coIncome;
+  d.negEquity=Math.max(0,d.tradePayoff-d.tradeValue);
+  d.tradeEquity=Math.max(0,d.tradeValue-d.tradePayoff);
+  d.totalBackend=d.warranty+d.gap+d.otherBackend;
+  d.taxableAmount=d.sellingPrice-d.tradeValue; // most states tax net of trade
+  if(d.taxableAmount<0)d.taxableAmount=0;
+  d.salesTax=d.taxableAmount*(d.taxRate/100);
+  d.totalDealAmount=d.sellingPrice+d.salesTax+d.fees+d.negEquity+d.totalBackend-d.rebates;
+  d.amountFinanced=d.totalDealAmount-d.cashDown-d.tradeEquity;
+  if(d.amountFinanced<0)d.amountFinanced=0;
+
+  // LTV / Advance
+  let baseValue=d.newUsed==='new'?(d.invoice>0?d.invoice:d.sellingPrice):d.bookValue;
+  d.baseValue=baseValue;
+  d.advancePct=baseValue>0?(d.amountFinanced/baseValue)*100:0;
+
+  // Find credit tier
+  d.tier=AUTO_CREDIT_TIERS.find(t=>d.creditScore>=t.min&&d.creditScore<=t.max)||AUTO_CREDIT_TIERS[AUTO_CREDIT_TIERS.length-1];
+  if(d.buyRate===0)d.buyRate=d.tier.buyRate;
+  d.customerRate=d.buyRate+d.markup;
+
+  // Monthly payment
+  let r=d.customerRate/100/12;
+  if(r>0&&d.term>0){
+    d.monthlyPayment=d.amountFinanced*(r*Math.pow(1+r,d.term))/(Math.pow(1+r,d.term)-1);
+  }else{
+    d.monthlyPayment=d.amountFinanced/d.term;
+  }
+
+  // PTI and DTI
+  d.pti=d.totalIncome>0?(d.monthlyPayment/d.totalIncome)*100:0;
+  d.totalMonthlyDebt=d.housingPayment+d.otherDebts+d.monthlyPayment;
+  d.dti=d.totalIncome>0?(d.totalMonthlyDebt/d.totalIncome)*100:0;
+
+  // Vehicle age
+  d.vehAge=2026-d.vehYear;
+
+  // Dealer reserve (profit)
+  let buyR=d.buyRate/100/12;
+  let custR=d.customerRate/100/12;
+  let buyPmt=buyR>0?d.amountFinanced*(buyR*Math.pow(1+buyR,d.term))/(Math.pow(1+buyR,d.term)-1):d.amountFinanced/d.term;
+  d.dealerReserve=(d.monthlyPayment-buyPmt)*d.term;
+  d.dealerReserveFlat=d.dealerReserve;
+
+  return d;
+}
+// ===================== SCORING FACTORS =====================
+
+function scoreCredit(d){
+  let max=100,pts=d.tier.approvalOdds,actions=[];
+  let risk=pts>=80?"LOW":pts>=55?"MODERATE":pts>=30?"HIGH":"VERY HIGH";
+  if(d.creditScore<620)actions.push("Below 620: limited to sub-prime/special finance lenders");
+  if(d.creditScore<660&&d.creditScore>=620)actions.push("620-659: Non-prime territory. Expect higher rates. Need strong down + stability.");
+  if(d.creditScore>=660&&d.creditScore<700)actions.push("660-699: Near-prime. Most banks will look. Focus on advance % and PTI.");
+  if(d.creditScore>=700&&d.creditScore<740)actions.push("700+: Prime. Most auto-approve. Push for best rate and max advance.");
+  if(d.coCreditScore>d.creditScore&&d.coCreditScore>0)actions.push("Co-signer has stronger score ("+d.coCreditScore+") - submit with co-signer as primary applicant on RouteOne");
+  return{cat:"Credit",name:"Credit Score / Auto FICO Tier",value:d.creditScore+" ("+d.tier.label+")",
+    pts:pts,max:max,risk:risk,expl:"Auto FICO tier: "+d.tier.label+". Buy rate: "+d.buyRate.toFixed(1)+"%",actions:actions};
+}
+
+function scoreCreditHistory(d){
+  let max=60,pts=60,actions=[];
+  if(d.bkMonths<12){pts-=30;actions.push("BK <12 months: most banks won't touch it. Try sub-prime lenders (Santander, Westlake).");
+  }else if(d.bkMonths<24){pts-=20;actions.push("BK 12-24 months: limited options. Need strong down payment (20%+) and proof of reestablished credit.");
+  }else if(d.bkMonths<36){pts-=10;actions.push("BK 24-36 months: some banks will look with discharged BK + reestablished credit.");}
+  if(d.repoMonths<12){pts-=25;actions.push("Repo <12 months: extremely difficult. Sub-prime only, big down payment needed.");
+  }else if(d.repoMonths<24){pts-=15;actions.push("Repo 12-24 months: sub-prime/non-prime. Need to show payment ability since repo.");
+  }else if(d.repoMonths<36){pts-=8;actions.push("Repo 24-36 months: some non-prime lenders will work it.");}
+  if(d.lates12>0){pts-=d.lates12*10;actions.push(d.lates12+" late payments in 12 months - banks see this as current payment risk");}
+  if(d.collectionsCount>0){pts-=d.collectionsCount*5;
+    if(d.collectionsCount>=3)actions.push("Multiple collections - some banks require medical collections excluded or paid before funding");}
+  if(d.autoTradelines>=1&&d.currentAutoMonths>=12)pts+=5; // positive auto history
+  pts=Math.max(0,pts);
+  let risk=pts>=45?"LOW":pts>=25?"MODERATE":"HIGH";
+  return{cat:"Credit",name:"Credit History (BK/Repo/Lates)",
+    value:"BK: "+(d.bkMonths>=999?"Never":d.bkMonths+"mo ago")+", Repo: "+(d.repoMonths>=999?"Never":d.repoMonths+"mo ago")+", Lates: "+d.lates12,
+    pts:pts,max:max,risk:risk,expl:"Banks check BK, repo, and recent lates heavily. Clean auto history is a big plus.",actions:actions};
+}
+
+function scoreAutoHistory(d){
+  let max=40,pts=0,actions=[];
+  if(d.autoTradelines>=2&&d.currentAutoMonths>=18){pts=40;
+  }else if(d.autoTradelines>=1&&d.currentAutoMonths>=12){pts=30;
+  }else if(d.autoTradelines>=1){pts=20;
+  }else{pts=5;actions.push("First-time auto buyer (FTB): limited lenders. Some CUs have FTB programs.");
+    actions.push("FTB tip: co-signer with auto history dramatically improves approval odds");}
+  if(d.totalTradelines<3){pts=Math.min(pts,15);actions.push("Thin file (<3 tradelines). Banks may require additional stips or co-signer.");}
+  let risk=pts>=25?"LOW":pts>=15?"MODERATE":"HIGH";
+  return{cat:"Credit",name:"Auto Loan History",value:d.autoTradelines+" auto tradeline(s), "+d.currentAutoMonths+" months on current",
+    pts:pts,max:max,risk:risk,expl:"Prior auto loan paid on time is the #1 thing banks look for. Proves payment pattern.",actions:actions};
+}
+
+function scoreAdvance(d){
+  let max=100,pts=0,actions=[];
+  let adv=d.advancePct;
+  let tierMax=d.tier.maxAdv;
+  if(adv<=90){pts=100;
+  }else if(adv<=100){pts=85;
+  }else if(adv<=110){pts=65;
+  }else if(adv<=120){pts=45;
+    actions.push("Advance "+adv.toFixed(0)+"% is high. Banks will scrutinize. Reduce backend or increase cash down.");
+  }else if(adv<=130){pts=25;
+    actions.push("Advance "+adv.toFixed(0)+"% is very high. Only captive/prime lenders allow this.");
+    actions.push("Strip backend products or add $"+(Math.round((adv-110)/100*d.baseValue/500)*500).toLocaleString()+" more cash down.");
+  }else{pts=5;
+    actions.push("ADVANCE "+adv.toFixed(0)+"% WAY OVER - most banks cap at 110-130%. Deal is flipped.");
+    let needDown=(d.amountFinanced-d.baseValue*1.1);
+    actions.push("Need $"+Math.max(0,Math.round(needDown)).toLocaleString()+" more down OR strip $"+Math.max(0,Math.round(needDown)).toLocaleString()+" in backend to hit 110%");
+  }
+  if(adv>tierMax)actions.push("Your credit tier ("+d.tier.label+") max advance is "+tierMax+"%. Currently at "+adv.toFixed(0)+"%.");
+  let risk=pts>=65?"LOW":pts>=40?"MODERATE":pts>=20?"HIGH":"VERY HIGH";
+  return{cat:"Deal Structure",name:"Advance % (LTV on Book)",value:adv.toFixed(1)+"% of "+(d.newUsed==='new'?"invoice":"book value")+" ($"+d.baseValue.toLocaleString()+")",
+    pts:pts,max:max,risk:risk,expl:"Advance % = amount financed vs vehicle value. Banks cap this per credit tier. #1 reason for turndowns.",actions:actions};
+}
+
+function scorePTI(d){
+  let max=80,pts=0,actions=[];
+  let pti=d.pti;
+  if(pti<=10){pts=80;
+  }else if(pti<=12){pts=70;
+  }else if(pti<=15){pts=55;
+  }else if(pti<=18){pts=40;
+    actions.push("PTI at "+pti.toFixed(1)+"% - at the edge for most banks. Under 15% is ideal.");
+  }else if(pti<=20){pts=25;
+    actions.push("PTI "+pti.toFixed(1)+"% is high. Extend term, increase down, or lower selling price.");
+  }else if(pti<=25){pts=12;
+    actions.push("PTI "+pti.toFixed(1)+"% exceeds most bank limits. Need co-signer income or different vehicle.");
+  }else{pts=3;
+    actions.push("PTI "+pti.toFixed(1)+"% is a non-starter. Payment is too high relative to income.");}
+  let risk=pts>=55?"LOW":pts>=30?"MODERATE":pts>=12?"HIGH":"VERY HIGH";
+  return{cat:"Capacity",name:"Payment-to-Income (PTI)",value:pti.toFixed(1)+"% ($"+Math.round(d.monthlyPayment).toLocaleString()+"/mo on $"+d.totalIncome.toLocaleString()+"/mo income)",
+    pts:pts,max:max,risk:risk,expl:"PTI = car payment / gross income. Most banks want under 15-18%. The lower the better.",actions:actions};
+}
+
+function scoreDTI(d){
+  let max=80,pts=0,actions=[];
+  let dti=d.dti;
+  if(dti<=35){pts=80;
+  }else if(dti<=40){pts=65;
+  }else if(dti<=45){pts=50;
+  }else if(dti<=50){pts=35;
+    actions.push("DTI at "+dti.toFixed(1)+"% is high. Banks want total debts under 45-50%.");
+  }else if(dti<=55){pts=20;
+    actions.push("DTI "+dti.toFixed(1)+"% exceeds most bank limits. Pay off a debt or add co-signer.");
+  }else{pts=5;
+    actions.push("DTI "+dti.toFixed(1)+"% is a deal-killer for most banks. Need significant restructuring.");}
+  if(d.housingPayment===0)actions.push("No housing payment shown - banks will ask. If living rent-free, document it (letter from parent/landlord).");
+  let risk=pts>=50?"LOW":pts>=30?"MODERATE":pts>=15?"HIGH":"VERY HIGH";
+  return{cat:"Capacity",name:"Debt-to-Income (DTI)",value:dti.toFixed(1)+"% ($"+Math.round(d.totalMonthlyDebt).toLocaleString()+"/mo total)",
+    pts:pts,max:max,risk:risk,expl:"DTI = all monthly debts (housing + car + other) / gross income.",actions:actions};
+}
+
+function scoreStability(d){
+  let max=40,pts=0,actions=[];
+  // Job
+  if(d.jobMonths>=24)pts+=20;
+  else if(d.jobMonths>=12)pts+=15;
+  else if(d.jobMonths>=6){pts+=8;actions.push("Less than 1 year at job - banks may stip for offer letter or prior employment proof");}
+  else{pts+=3;actions.push("Under 6 months at job - most banks want 6+ months. May need co-signer.");
+    actions.push("If same field/industry, document it - banks accept job changes within same industry");}
+  // Residence
+  if(d.resMonths>=24)pts+=15;
+  else if(d.resMonths>=12)pts+=10;
+  else if(d.resMonths>=6)pts+=5;
+  else{pts+=2;actions.push("Under 6 months at residence - banks see instability. Provide prior address history.");}
+  // Income type
+  if(d.incomeType==='w2')pts+=5;
+  else if(d.incomeType==='ssi')pts+=4;
+  else if(d.incomeType==='1099'){pts+=2;actions.push("1099/self-employed: banks usually want 2 years tax returns. Some accept 3-6 months bank statements.");}
+  else{pts+=0;actions.push("Cash income: very limited lenders. Need 3-6 months bank statements showing consistent deposits.");}
+  let risk=pts>=28?"LOW":pts>=18?"MODERATE":"HIGH";
+  return{cat:"Stability",name:"Job + Residence + Income Type",value:d.jobMonths+" months at job, "+d.resMonths+" months at residence, "+d.incomeType.toUpperCase(),
+    pts:pts,max:max,risk:risk,expl:"Banks score time on job, time at residence, and income stability. 2+ years is ideal.",actions:actions};
+}
+
+function scoreVehicle(d){
+  let max=40,pts=0,actions=[];
+  // Age
+  if(d.newUsed==='new'){pts+=20;
+  }else{
+    if(d.vehAge<=2)pts+=18;
+    else if(d.vehAge<=4)pts+=15;
+    else if(d.vehAge<=6)pts+=10;
+    else if(d.vehAge<=8){pts+=5;actions.push("Vehicle is "+d.vehAge+" years old. Some banks cap at 7-8 years for used.");}
+    else{pts+=2;actions.push("Vehicle "+d.vehAge+" years old - most prime banks won't finance 10+ year old vehicles.");
+      actions.push("Try credit unions or non-prime lenders for older vehicles");}
+  }
+  // Mileage
+  if(d.vehMileage<=30000)pts+=15;
+  else if(d.vehMileage<=60000)pts+=12;
+  else if(d.vehMileage<=80000)pts+=9;
+  else if(d.vehMileage<=100000)pts+=6;
+  else if(d.vehMileage<=120000){pts+=3;actions.push("High mileage ("+d.vehMileage.toLocaleString()+") - limits bank options. Max 100-120K for most.");}
+  else{pts+=1;actions.push("Mileage over 120K - very limited financing options. CU or BHPH only.");}
+  // CPO bonus
+  if(d.newUsed==='cpo'){pts+=5;actions.push("CPO is a plus - extended warranty and better terms from captive lenders");}
+  let risk=pts>=25?"LOW":pts>=15?"MODERATE":"HIGH";
+  return{cat:"Collateral",name:"Vehicle Age + Mileage",value:d.vehYear+" ("+d.vehAge+" years old), "+d.vehMileage.toLocaleString()+" miles, "+d.newUsed.toUpperCase(),
+    pts:pts,max:max,risk:risk,expl:"Banks set limits on vehicle age and mileage. Newer/lower miles = more lender options.",actions:actions};
+}
+
+function scoreDownPayment(d){
+  let max=60,pts=0,actions=[];
+  let downPct=d.sellingPrice>0?((d.cashDown+d.tradeEquity)/d.sellingPrice)*100:0;
+  if(downPct>=20)pts=60;
+  else if(downPct>=15)pts=50;
+  else if(downPct>=10)pts=40;
+  else if(downPct>=5){pts=25;actions.push("Under 10% down. More down = better approval odds and lower payment.");}
+  else if(downPct>0){pts=12;actions.push("Minimal down payment. Most sub-prime banks want 10-20% down.");}
+  else{pts=3;actions.push("Zero down = zero-down lenders only. Severely limits options.");
+    actions.push("Even $500-$1000 down shows commitment and opens more banks");}
+  if(d.negEquity>0){pts-=15;
+    actions.push("NEGATIVE EQUITY: $"+d.negEquity.toLocaleString()+" rolled in from trade. Banks hate neg equity.");
+    actions.push("Cover neg equity with more cash down, or sell trade privately to get more");}
+  pts=Math.max(0,pts);
+  let risk=pts>=40?"LOW":pts>=20?"MODERATE":"HIGH";
+  return{cat:"Deal Structure",name:"Down Payment / Equity Position",
+    value:"$"+d.cashDown.toLocaleString()+" cash"+(d.tradeEquity>0?" + $"+d.tradeEquity.toLocaleString()+" trade equity":"")+(d.negEquity>0?" - $"+d.negEquity.toLocaleString()+" neg equity":"")+" ("+downPct.toFixed(1)+"%)",
+    pts:pts,max:max,risk:risk,expl:"Down payment shows skin in the game. Sub-prime banks require 10-20% minimum.",actions:actions};
+}
+// ===================== BANK MATCHING & DEAL OPTIMIZATION =====================
+
+function matchBanks(d){
+  let matches=[];
+  for(let bank of LENDER_PROFILES){
+    let eligible=true,reasons=[],tips=[];
+    let score=d.creditScore;if(d.coCreditScore>score&&d.coCreditScore>0)score=d.coCreditScore;
+    if(score<bank.minFico){eligible=false;reasons.push("FICO "+d.creditScore+" below minimum "+bank.minFico);}
+    if(d.dti>bank.maxDTI){eligible=false;reasons.push("DTI "+d.dti.toFixed(1)+"% over max "+bank.maxDTI+"%");}
+    if(d.pti>bank.maxPTI){eligible=false;reasons.push("PTI "+d.pti.toFixed(1)+"% over max "+bank.maxPTI+"%");}
+    if(d.advancePct>bank.maxAdv){eligible=false;reasons.push("Advance "+d.advancePct.toFixed(0)+"% over max "+bank.maxAdv+"%");}
+    if(d.term>bank.maxTerm){eligible=false;reasons.push("Term "+d.term+"mo over max "+bank.maxTerm+"mo");}
+    if(d.vehAge>bank.maxAge){eligible=false;reasons.push("Vehicle too old ("+d.vehAge+" yrs, max "+bank.maxAge+")");}
+    if(d.vehMileage>bank.maxMiles){eligible=false;reasons.push("Mileage too high ("+d.vehMileage.toLocaleString()+", max "+bank.maxMiles.toLocaleString()+")");}
+    // Estimate rate for this bank
+    let estRate=Math.max(bank.rateFloor,d.buyRate);
+    let status=eligible?"SUBMIT":"LIKELY DECLINE";
+    // Borderline?
+    let borderline=false;
+    if(!eligible&&reasons.length===1){borderline=true;status="BORDERLINE";tips.push("Close to qualifying - see if you can adjust the deal to fix: "+reasons[0]);}
+    if(eligible){
+      if(bank.type==='credit_union')tips.push("Submit through CUDL for fastest processing");
+      else tips.push("Submit through RouteOne");
+      if(d.advancePct>bank.maxAdv-10)tips.push("Advance is close to max - consider stripping backend before submission");
+    }
+    matches.push({bank:bank,eligible:eligible,borderline:borderline,status:status,reasons:reasons,tips:tips,estRate:estRate});
+  }
+  return matches;
+}
+
+function buildScenarios(d){
+  let scenarios=[];
+  // More cash down
+  if(d.cashDown<d.sellingPrice*0.15){
+    let targets=[{amt:1000,label:"$1,000 more"},{amt:2500,label:"$2,500 more"},{amt:5000,label:"$5,000 more"}];
+    for(let t of targets){
+      let newDown=d.cashDown+t.amt;
+      let newFinanced=d.amountFinanced-t.amt;
+      let newAdv=d.baseValue>0?(newFinanced/d.baseValue)*100:0;
+      let r=d.customerRate/100/12;
+      let newPmt=r>0?newFinanced*(r*Math.pow(1+r,d.term))/(Math.pow(1+r,d.term)-1):newFinanced/d.term;
+      let newPTI=d.totalIncome>0?(newPmt/d.totalIncome)*100:0;
+      scenarios.push({name:"Add "+t.label+" cash down",
+        desc:"Down to $"+Math.round(newDown).toLocaleString()+". New advance: "+newAdv.toFixed(0)+"%. New payment: $"+Math.round(newPmt).toLocaleString()+"/mo. PTI: "+newPTI.toFixed(1)+"%",
+        impact:"Advance drops to "+newAdv.toFixed(0)+"%, payment drops $"+Math.round(d.monthlyPayment-newPmt)+"/mo"});
+    }
+  }
+  // Strip backend
+  if(d.totalBackend>0){
+    let stripped=d.amountFinanced-d.totalBackend;
+    let newAdv=d.baseValue>0?(stripped/d.baseValue)*100:0;
+    let r=d.customerRate/100/12;
+    let newPmt=r>0?stripped*(r*Math.pow(1+r,d.term))/(Math.pow(1+r,d.term)-1):stripped/d.term;
+    scenarios.push({name:"Strip ALL backend products",
+      desc:"Remove $"+d.totalBackend.toLocaleString()+" in backend (warranty/GAP/other). New financed: $"+Math.round(stripped).toLocaleString()+". Advance: "+newAdv.toFixed(0)+"%",
+      impact:"Advance drops to "+newAdv.toFixed(0)+"%, payment drops $"+Math.round(d.monthlyPayment-newPmt)+"/mo"});
+    if(d.warranty>0){
+      let partStrip=d.amountFinanced-d.warranty;
+      let partAdv=d.baseValue>0?(partStrip/d.baseValue)*100:0;
+      let partPmt=r>0?partStrip*(r*Math.pow(1+r,d.term))/(Math.pow(1+r,d.term)-1):partStrip/d.term;
+      scenarios.push({name:"Strip warranty only (keep GAP)",
+        desc:"Remove $"+d.warranty.toLocaleString()+" warranty. Advance: "+partAdv.toFixed(0)+"%. Payment: $"+Math.round(partPmt).toLocaleString()+"/mo",
+        impact:"Advance drops to "+partAdv.toFixed(0)+"%, payment drops $"+Math.round(d.monthlyPayment-partPmt)+"/mo"});
+    }
+  }
+  // Extend term
+  if(d.term<84){
+    let longerTerm=Math.min(84,d.term+12);
+    let r=d.customerRate/100/12;
+    let newPmt=r>0?d.amountFinanced*(r*Math.pow(1+r,longerTerm))/(Math.pow(1+r,longerTerm)-1):d.amountFinanced/longerTerm;
+    let newPTI=d.totalIncome>0?(newPmt/d.totalIncome)*100:0;
+    scenarios.push({name:"Extend term to "+longerTerm+" months",
+      desc:"Longer term = lower payment. New payment: $"+Math.round(newPmt).toLocaleString()+"/mo. PTI: "+newPTI.toFixed(1)+"%",
+      impact:"Payment drops $"+Math.round(d.monthlyPayment-newPmt)+"/mo, PTI drops to "+newPTI.toFixed(1)+"%"});
+  }
+  // Shorten term (for better approval on some banks)
+  if(d.term>60){
+    let shorterTerm=60;
+    let r=d.customerRate/100/12;
+    let newPmt=r>0?d.amountFinanced*(r*Math.pow(1+r,shorterTerm))/(Math.pow(1+r,shorterTerm)-1):d.amountFinanced/shorterTerm;
+    scenarios.push({name:"Shorten term to 60 months",
+      desc:"Some banks prefer shorter terms for lower credit. Payment: $"+Math.round(newPmt).toLocaleString()+"/mo (higher but more lenders)",
+      impact:"Opens more lender options, less total interest paid"});
+  }
+  // Co-signer
+  if(d.coIncome===0&&d.creditScore<700){
+    scenarios.push({name:"Add co-signer",
+      desc:"Co-signer with stronger credit + income dramatically improves approval odds and lowers rate.",
+      impact:"Can move up 1-2 credit tiers, lower rate 3-8%, higher advance allowed"});
+  }
+  // Different vehicle (lower price)
+  if(d.advancePct>110){
+    let maxFinanced=d.baseValue*1.10;
+    let priceDrop=d.amountFinanced-maxFinanced;
+    scenarios.push({name:"Switch to lower-priced vehicle",
+      desc:"Current advance is "+d.advancePct.toFixed(0)+"%. Need to reduce amount financed by $"+Math.round(priceDrop).toLocaleString()+" to hit 110%.",
+      impact:"Opens all prime/near-prime banks, better rate, better approval odds"});
+  }
+  // Reduce markup for customer rate improvement
+  if(d.markup>0){
+    let r0=d.buyRate/100/12;
+    let basePmt=r0>0?d.amountFinanced*(r0*Math.pow(1+r0,d.term))/(Math.pow(1+r0,d.term)-1):d.amountFinanced/d.term;
+    scenarios.push({name:"Reduce dealer markup to get deal bought",
+      desc:"If bank is hesitant, offering at buy rate ("+d.buyRate.toFixed(1)+"%) brings payment to $"+Math.round(basePmt).toLocaleString()+"/mo. Lose reserve but save the deal.",
+      impact:"Payment drops $"+Math.round(d.monthlyPayment-basePmt)+"/mo, PTI improves"});
+  }
+  return scenarios;
+}
+
+function buildStipList(d){
+  let stips=[];
+  // Standard stips everyone gets
+  stips.push("Proof of Income (most recent paystub covering 30 days)");
+  stips.push("Valid Driver's License");
+  stips.push("Proof of Insurance (full coverage, new vehicle on policy)");
+  stips.push("References (2-5 personal references with phone numbers)");
+  // Conditional stips
+  if(d.incomeType==='1099')stips.push("2 Years Tax Returns (1099/self-employed)");
+  if(d.incomeType==='cash')stips.push("3-6 Months Bank Statements (cash income verification)");
+  if(d.incomeType==='ssi')stips.push("SSI/Disability Award Letter or Pension Statement");
+  if(d.jobMonths<6)stips.push("Offer Letter or Prior Employment Verification");
+  if(d.jobMonths<12)stips.push("Employment Verification (VOE) may be called in");
+  if(d.resMonths<12)stips.push("Proof of Residence (utility bill or lease)");
+  if(d.bkMonths<48&&d.bkMonths<999)stips.push("BK Discharge Papers");
+  if(d.creditScore<620)stips.push("Proof of Residence (utility bill)");
+  if(d.creditScore<580)stips.push("GPS/Starter Interrupt device may be required (sub-prime)");
+  if(d.tradePayoff>0)stips.push("10-Day Trade Payoff Letter");
+  if(d.cashDown>=5000)stips.push("Proof of Down Payment (bank statement or sourced funds)");
+  if(d.negEquity>0)stips.push("Banks may request explanation of negative equity");
+  if(d.totalTradelines<3)stips.push("Additional references or co-signer may be required (thin file)");
+  if(d.housingPayment===0)stips.push("Letter Explaining Housing Situation (living rent-free)");
+  return stips;
+}
+
+function getSubmissionStrategy(d,bankMatches){
+  let strategy=[];
+  let eligible=bankMatches.filter(b=>b.eligible);
+  let borderline=bankMatches.filter(b=>b.borderline);
+
+  strategy.push("STEP 1: Shotgun approach - submit to all eligible lenders simultaneously");
+  if(eligible.some(b=>b.bank.type==='credit_union'))
+    strategy.push("STEP 2: Hit CUDL first for credit unions - they usually give best rates");
+  strategy.push("STEP 2: Submit to RouteOne for banks and captive lenders");
+  strategy.push("STEP 3: Wait for auto-approvals (usually 30 seconds to 2 minutes)");
+  strategy.push("STEP 4: If you get multiple approvals, pit lenders against each other for best rate/advance");
+  if(borderline.length>0)
+    strategy.push("STEP 5: For borderline banks, call the dealer line and explain the deal - a human may override the AUS");
+  if(d.creditScore<620)
+    strategy.push("TIP: For sub-prime, call the lender rep directly. Relationships matter more than routing.");
+  if(d.advancePct>110)
+    strategy.push("TIP: If advance is too high, submit a stripped deal first to get approval, then negotiate adding backend");
+  strategy.push("TIP: If first round gets declined, restructure (more down, strip backend, shorter term) and resubmit");
+  return strategy;
+}
+// ===================== MAIN ANALYSIS + RENDER =====================
+
+function runAnalysis(){
+  let d=getInputs();
+  let factors=[];
+  let compensating=[];
+  let riskFlags=[];
+
+  factors.push(scoreCredit(d));
+  let histF=scoreCreditHistory(d);factors.push(histF);
+  if(d.bkMonths<36&&d.bkMonths<999)riskFlags.push("Bankruptcy "+d.bkMonths+" months ago");
+  if(d.repoMonths<36&&d.repoMonths<999)riskFlags.push("Repossession "+d.repoMonths+" months ago");
+  if(d.lates12>0)riskFlags.push(d.lates12+" late payments in last 12 months");
+  factors.push(scoreAutoHistory(d));
+  factors.push(scoreAdvance(d));
+  factors.push(scorePTI(d));
+  factors.push(scoreDTI(d));
+  factors.push(scoreStability(d));
+  factors.push(scoreVehicle(d));
+  factors.push(scoreDownPayment(d));
+
+  // Compensating factors
+  if(d.autoTradelines>=1&&d.currentAutoMonths>=12)compensating.push("Existing auto loan with "+d.currentAutoMonths+" months clean payments");
+  if(d.jobMonths>=24)compensating.push("Stable employment: "+Math.floor(d.jobMonths/12)+"+ years at current job");
+  if(d.resMonths>=24)compensating.push("Stable residence: "+Math.floor(d.resMonths/12)+"+ years");
+  let downPct=d.sellingPrice>0?((d.cashDown+d.tradeEquity)/d.sellingPrice)*100:0;
+  if(downPct>=15)compensating.push("Strong down payment: "+downPct.toFixed(0)+"% of selling price");
+  if(d.advancePct<=100)compensating.push("Clean advance at "+d.advancePct.toFixed(0)+"% - under book value");
+  if(d.pti<=12)compensating.push("Low PTI: "+d.pti.toFixed(1)+"% - payment well within income");
+  if(d.dti<=40)compensating.push("Low DTI: "+d.dti.toFixed(1)+"% - strong debt capacity");
+  if(d.incomeType==='w2')compensating.push("W-2 verifiable income");
+
+  // Totals
+  let totalScore=factors.reduce((s,f)=>s+f.pts,0);
+  let maxScore=factors.reduce((s,f)=>s+f.max,0);
+  let scorePct=maxScore>0?(totalScore/maxScore)*100:0;
+
+  // Determine recommendation
+  let rec,recClass;
+  if(scorePct>=75&&riskFlags.length===0){rec="AUTO-APPROVE LIKELY";recClass="rec-autoapprove";}
+  else if(scorePct>=60&&riskFlags.length<=1){rec="CONDITIONAL APPROVAL";recClass="rec-conditional";}
+  else if(scorePct>=40){rec="COUNTER / RESTRUCTURE NEEDED";recClass="rec-counter";}
+  else{rec="TURNDOWN RISK - RESTRUCTURE DEAL";recClass="rec-turndown";}
+
+  // Approval probability
+  let prob=scorePct;
+  if(d.bkMonths<24&&d.bkMonths<999)prob-=20;
+  if(d.repoMonths<24&&d.repoMonths<999)prob-=15;
+  prob+=Math.min(compensating.length*3,15);
+  prob-=riskFlags.length*5;
+  prob=Math.max(1,Math.min(99,prob));
+
+  // Bank matching
+  let bankMatches=matchBanks(d);
+  let scenarios=buildScenarios(d);
+  let stips=buildStipList(d);
+  let strategy=getSubmissionStrategy(d,bankMatches);
+
+  // =============== RENDER ===============
+  let html='';
+
+  // === DESK SUMMARY ===
+  html+='<div class="panel"><h2>DESK SUMMARY</h2>';
+  html+='<div style="text-align:center;margin:16px 0"><span class="rec-badge '+recClass+'">'+rec+'</span></div>';
+  html+='<div class="metrics-row">';
+  html+='<div class="metric-card"><div class="lbl">Score</div><div class="val '+(scorePct>=70?"val-good":scorePct>=50?"val-warn":"val-bad")+'">'+scorePct.toFixed(0)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Approval Odds</div><div class="val '+(prob>=70?"val-good":prob>=45?"val-warn":"val-bad")+'">'+prob.toFixed(0)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Credit Tier</div><div class="val" style="font-size:1em">'+d.tier.label+'</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Amount Financed</div><div class="val" style="font-size:1.1em">$'+Math.round(d.amountFinanced).toLocaleString()+'</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Monthly Payment</div><div class="val" style="font-size:1.1em">$'+Math.round(d.monthlyPayment).toLocaleString()+'</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Advance %</div><div class="val '+(d.advancePct<=110?"val-good":d.advancePct<=125?"val-warn":"val-bad")+'">'+d.advancePct.toFixed(0)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">PTI</div><div class="val '+(d.pti<=15?"val-good":d.pti<=20?"val-warn":"val-bad")+'">'+d.pti.toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">DTI</div><div class="val '+(d.dti<=45?"val-good":d.dti<=55?"val-warn":"val-bad")+'">'+d.dti.toFixed(1)+'%</div></div>';
+  html+='</div>';
+
+  // Deal numbers
+  html+='<div class="desk-box"><h3>Deal Breakdown</h3><div class="two-col">';
+  html+='<div>';
+  html+='<table class="guideline-table"><tr><td>Selling Price</td><td>$'+d.sellingPrice.toLocaleString()+'</td></tr>';
+  html+='<tr><td>Sales Tax ('+d.taxRate+'%)</td><td>$'+Math.round(d.salesTax).toLocaleString()+'</td></tr>';
+  html+='<tr><td>Doc/Title/Reg Fees</td><td>$'+d.fees.toLocaleString()+'</td></tr>';
+  if(d.negEquity>0)html+='<tr><td style="color:#f87171">Negative Equity</td><td style="color:#f87171">+$'+d.negEquity.toLocaleString()+'</td></tr>';
+  if(d.totalBackend>0)html+='<tr><td>Backend Products</td><td>$'+d.totalBackend.toLocaleString()+'</td></tr>';
+  if(d.rebates>0)html+='<tr><td style="color:#34d399">Rebates/Incentives</td><td style="color:#34d399">-$'+d.rebates.toLocaleString()+'</td></tr>';
+  html+='<tr><td><strong>Total Deal</strong></td><td><strong>$'+Math.round(d.totalDealAmount).toLocaleString()+'</strong></td></tr>';
+  html+='<tr><td>Cash Down</td><td>-$'+d.cashDown.toLocaleString()+'</td></tr>';
+  if(d.tradeEquity>0)html+='<tr><td>Trade Equity</td><td>-$'+d.tradeEquity.toLocaleString()+'</td></tr>';
+  html+='<tr><td><strong>Amount Financed</strong></td><td><strong>$'+Math.round(d.amountFinanced).toLocaleString()+'</strong></td></tr></table>';
+  html+='</div><div>';
+  html+='<table class="guideline-table"><tr><td>Book Value</td><td>$'+d.baseValue.toLocaleString()+'</td></tr>';
+  html+='<tr><td>Advance %</td><td>'+d.advancePct.toFixed(1)+'%</td></tr>';
+  html+='<tr><td>Buy Rate</td><td>'+d.buyRate.toFixed(2)+'%</td></tr>';
+  html+='<tr><td>Dealer Markup</td><td>+'+d.markup.toFixed(2)+'%</td></tr>';
+  html+='<tr><td>Customer Rate</td><td>'+d.customerRate.toFixed(2)+'%</td></tr>';
+  html+='<tr><td>Term</td><td>'+d.term+' months</td></tr>';
+  html+='<tr><td><strong>Monthly Payment</strong></td><td><strong>$'+Math.round(d.monthlyPayment).toLocaleString()+'</strong></td></tr>';
+  html+='<tr><td>Dealer Reserve (est)</td><td style="color:#34d399">$'+Math.round(d.dealerReserve).toLocaleString()+'</td></tr></table>';
+  html+='</div></div></div>';
+  html+='</div>';
+
+  // === SCORING BREAKDOWN ===
+  html+='<div class="panel"><h2>SCORING BREAKDOWN</h2>';
+  for(let f of factors){
+    let pct=f.max>0?(f.pts/f.max)*100:0;
+    let riskCls=f.risk==="LOW"?"risk-low":f.risk==="MODERATE"?"risk-mod":f.risk==="HIGH"?"risk-high":"risk-vhigh";
+    let barCls=pct>=65?"bar-good":pct>=40?"bar-warn":"bar-bad";
+    let riskColor=f.risk==="LOW"?"val-good":f.risk==="MODERATE"?"val-warn":"val-bad";
+    html+='<div class="factor-row '+riskCls+'">';
+    html+='<div class="factor-header"><span class="factor-name">'+f.cat+' > '+f.name+'</span><span class="factor-score '+riskColor+'">'+Math.round(f.pts)+'/'+f.max+' ('+Math.round(pct)+'%)</span></div>';
+    html+='<div class="factor-value">'+f.value+'</div>';
+    html+='<div class="bar-container"><div class="bar-fill '+barCls+'" style="width:'+Math.min(100,pct)+'%"></div></div>';
+    html+='<div class="factor-explanation">'+f.expl+'</div>';
+    for(let a of f.actions)html+='<div class="action-item">'+a+'</div>';
+    html+='</div>';
+  }
+  if(compensating.length>0){html+='<h3>Compensating Factors</h3>';for(let c of compensating)html+='<div class="comp-factor">'+c+'</div>';}
+  if(riskFlags.length>0){html+='<h3>Risk Flags</h3>';for(let r of riskFlags)html+='<div class="risk-flag">'+r+'</div>';}
+  html+='</div>';
+
+  // === BANK MATCHING ===
+  html+='<div class="panel"><h2>BANK / LENDER MATCHING</h2>';
+  html+='<p style="color:#7a8ba8;font-size:0.9em;margin-bottom:12px">Based on your deal structure, here\'s where to submit:</p>';
+  let eligibleBanks=bankMatches.filter(b=>b.eligible);
+  let borderlineBanks=bankMatches.filter(b=>b.borderline&&!b.eligible);
+  let declineBanks=bankMatches.filter(b=>!b.eligible&&!b.borderline);
+
+  if(eligibleBanks.length>0){html+='<h3 style="color:#34d399">SUBMIT TO THESE ('+eligibleBanks.length+' matches)</h3>';}
+  for(let m of eligibleBanks){
+    html+='<div class="bank-card bank-match"><span class="bk-status bk-yes">'+m.status+'</span>';
+    html+='<div class="bk-name">'+m.bank.name+'</div>';
+    html+='<div class="bk-detail">Min FICO: '+m.bank.minFico+' | Max DTI: '+m.bank.maxDTI+'% | Max PTI: '+m.bank.maxPTI+'% | Max Advance: '+m.bank.maxAdv+'% | Max Term: '+m.bank.maxTerm+'mo</div>';
+    html+='<div class="bk-detail">Est Rate: '+m.estRate.toFixed(1)+'%+ | '+m.bank.notes+'</div>';
+    for(let s of m.bank.strengths)html+='<div style="color:#34d399;font-size:0.82em;padding-left:14px">+ '+s+'</div>';
+    for(let t of m.tips)html+='<div class="bk-tip">> '+t+'</div>';
+    html+='</div>';
+  }
+  if(borderlineBanks.length>0){html+='<h3 style="color:#fbbf24">BORDERLINE ('+borderlineBanks.length+' - may work with restructure)</h3>';}
+  for(let m of borderlineBanks){
+    html+='<div class="bank-card bank-maybe"><span class="bk-status bk-maybe">'+m.status+'</span>';
+    html+='<div class="bk-name">'+m.bank.name+'</div>';
+    html+='<div class="bk-detail">Issue: '+m.reasons.join(', ')+'</div>';
+    for(let t of m.tips)html+='<div class="bk-tip">> '+t+'</div>';
+    html+='</div>';
+  }
+  if(declineBanks.length>0){html+='<h3 style="color:#f87171">LIKELY DECLINE ('+declineBanks.length+')</h3>';}
+  for(let m of declineBanks){
+    html+='<div class="bank-card bank-no"><span class="bk-status bk-no">'+m.status+'</span>';
+    html+='<div class="bk-name">'+m.bank.name+'</div>';
+    html+='<div class="bk-detail" style="color:#f87171">'+m.reasons.join(' | ')+'</div>';
+    html+='</div>';
+  }
+  html+='</div>';
+
+  // === SUBMISSION STRATEGY ===
+  html+='<div class="panel"><h2>SUBMISSION STRATEGY (RouteOne / CUDL)</h2>';
+  for(let s of strategy)html+='<div class="note-line" style="padding:5px 0 5px 10px">'+s+'</div>';
+  html+='</div>';
+
+  // === DEAL RESTRUCTURE SCENARIOS ===
+  html+='<div class="panel"><h2>DEAL RESTRUCTURE OPTIONS</h2>';
+  html+='<p style="color:#7a8ba8;font-size:0.9em;margin-bottom:12px">If the deal gets countered or declined, try these adjustments:</p>';
+  for(let s of scenarios){
+    html+='<div class="scenario-card"><div class="sc-name">'+s.name+'</div>';
+    html+='<div class="sc-desc">'+s.desc+'</div>';
+    html+='<div class="sc-impact">'+s.impact+'</div></div>';
+  }
+  html+='</div>';
+
+  // === EXPECTED STIPS ===
+  html+='<div class="panel"><h2>EXPECTED STIPULATIONS</h2>';
+  html+='<p style="color:#7a8ba8;font-size:0.9em;margin-bottom:12px">Have these ready before submitting to avoid funding delays:</p>';
+  for(let s of stips)html+='<div class="stip-item">'+s+'</div>';
+  html+='</div>';
+
+  // === FINAL ACTION PLAN ===
+  html+='<div class="panel" style="border-color:#00d4ff"><h2>DESK ACTION PLAN</h2>';
+  html+='<div class="metrics-row">';
+  html+='<div class="metric-card"><div class="lbl">Verdict</div><div class="val" style="font-size:0.85em;color:'+(rec.includes("AUTO-APPROVE")?"#34d399":rec.includes("CONDITIONAL")?"#fbbf24":"#f87171")+'">'+rec+'</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Banks Available</div><div class="val val-good">'+eligibleBanks.length+'</div><div class="lbl">of '+LENDER_PROFILES.length+'</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Dealer Gross (est)</div><div class="val val-good">$'+(Math.round(d.dealerReserve)+d.totalBackend).toLocaleString()+'</div><div class="lbl">Reserve + Backend</div></div>';
+  html+='</div>';
+  html+='<h3>Top Actions</h3>';
+  let allActions=[];for(let f of factors)for(let a of f.actions)allActions.push(a);
+  for(let i=0;i<Math.min(6,allActions.length);i++)html+='<div class="action-item" style="font-size:0.95em;padding:5px 0 5px 20px">'+(i+1)+'. '+allActions[i]+'</div>';
+  if(allActions.length===0)html+='<div class="comp-factor">Deal looks clean - submit and get it bought!</div>';
+  html+='<p style="text-align:center;color:#00d4ff;margin-top:20px;font-weight:600">Adjust numbers above and re-analyze to find the structure that gets auto-approved.</p>';
+  html+='</div>';
+
+  document.getElementById('results').innerHTML=html;
+  document.getElementById('results').style.display='block';
+  document.getElementById('results').scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
