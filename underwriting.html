@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Automated Underwriting Scoring System</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0e1a;color:#e0e0e0;min-height:100vh}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+h1{text-align:center;color:#00d4ff;font-size:2em;margin:20px 0 5px;text-transform:uppercase;letter-spacing:3px}
+.subtitle{text-align:center;color:#7a8ba8;margin-bottom:30px;font-size:0.95em}
+.panel{background:#111827;border:1px solid #1e3a5f;border-radius:12px;padding:24px;margin-bottom:20px}
+.panel h2{color:#00d4ff;font-size:1.3em;margin-bottom:16px;border-bottom:1px solid #1e3a5f;padding-bottom:8px}
+.panel h3{color:#60a5fa;font-size:1.05em;margin:16px 0 10px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column}
+.form-group label{font-size:0.82em;color:#93a3b8;margin-bottom:4px;font-weight:500}
+.form-group input,.form-group select{background:#1a2332;border:1px solid #2d4a6f;color:#e0e0e0;padding:10px 12px;border-radius:8px;font-size:0.95em;outline:none;transition:border-color 0.2s}
+.form-group input:focus,.form-group select:focus{border-color:#00d4ff}
+.form-group input::placeholder{color:#4a5568}
+.btn{background:linear-gradient(135deg,#0066ff,#00d4ff);color:#fff;border:none;padding:16px 40px;font-size:1.15em;font-weight:700;border-radius:10px;cursor:pointer;display:block;width:100%;margin:24px 0;text-transform:uppercase;letter-spacing:2px;transition:transform 0.15s,box-shadow 0.15s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 25px rgba(0,212,255,0.35)}
+#results{display:none}
+.rec-badge{display:inline-block;padding:8px 20px;border-radius:8px;font-weight:700;font-size:1.1em;letter-spacing:1px}
+.rec-approve{background:#065f46;color:#34d399;border:1px solid #34d399}
+.rec-refer{background:#78350f;color:#fbbf24;border:1px solid #fbbf24}
+.rec-ineligible{background:#7f1d1d;color:#f87171;border:1px solid #f87171}
+.rec-oos{background:#4a1d1d;color:#ff5555;border:1px solid #ff5555}
+.metrics-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+.metric-card{background:#1a2332;border-radius:10px;padding:14px;text-align:center;border:1px solid #1e3a5f}
+.metric-card .val{font-size:1.6em;font-weight:700;margin:4px 0}
+.metric-card .lbl{font-size:0.78em;color:#7a8ba8;text-transform:uppercase;letter-spacing:1px}
+.val-good{color:#34d399}.val-warn{color:#fbbf24}.val-bad{color:#f87171}
+.bar-container{background:#1a2332;border-radius:6px;height:22px;overflow:hidden;margin:4px 0}
+.bar-fill{height:100%;border-radius:6px;transition:width 0.5s}
+.bar-good{background:linear-gradient(90deg,#059669,#34d399)}.bar-warn{background:linear-gradient(90deg,#d97706,#fbbf24)}.bar-bad{background:linear-gradient(90deg,#dc2626,#f87171)}
+.factor-row{background:#0d1520;border-radius:8px;padding:14px;margin:8px 0;border-left:4px solid #1e3a5f}
+.factor-row.risk-low{border-left-color:#34d399}.factor-row.risk-mod{border-left-color:#fbbf24}.factor-row.risk-high{border-left-color:#f87171}.factor-row.risk-vhigh{border-left-color:#ff0040}
+.factor-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.factor-name{font-weight:600;color:#e0e0e0;font-size:0.95em}
+.factor-score{font-weight:700;font-size:0.9em}
+.factor-value{font-size:0.82em;color:#93a3b8;margin-bottom:6px}
+.factor-explanation{font-size:0.82em;color:#7a8ba8;margin:6px 0}
+.action-item{font-size:0.82em;color:#fbbf24;padding:3px 0 3px 16px;position:relative}
+.action-item::before{content:"\2192";position:absolute;left:0}
+.comp-factor{color:#34d399;font-size:0.88em;padding:3px 0 3px 16px;position:relative}
+.comp-factor::before{content:"+";position:absolute;left:2px;font-weight:700}
+.risk-flag{color:#f87171;font-size:0.88em;padding:3px 0 3px 16px;position:relative}
+.risk-flag::before{content:"!";position:absolute;left:3px;font-weight:700}
+.scenario-card{background:#0d1520;border-radius:8px;padding:14px;margin:8px 0;border:1px solid #1e3a5f}
+.scenario-card .sc-name{font-weight:600;color:#60a5fa;font-size:0.95em}
+.scenario-card .sc-desc{font-size:0.82em;color:#93a3b8;margin:4px 0}
+.scenario-card .sc-meta{font-size:0.8em;color:#7a8ba8;margin:4px 0}
+.scenario-card .sc-impact{font-size:0.88em;font-weight:600;margin-top:6px}
+.impact-pos{color:#34d399}.impact-neg{color:#f87171}
+.program-card{background:#0d1520;border-radius:8px;padding:16px;margin:8px 0;border:1px solid #1e3a5f}
+.program-card.eligible{border-color:#059669}.program-card.ineligible{border-color:#7f1d1d}
+.program-card .pg-name{font-weight:700;font-size:1em}
+.program-card .pg-status{font-size:0.85em;font-weight:600;float:right}
+.pg-elig{color:#34d399}.pg-inelig{color:#f87171}
+.program-card .pg-detail{font-size:0.82em;color:#93a3b8;margin:4px 0}
+.program-card .pg-adv{color:#34d399;font-size:0.82em;padding-left:14px}
+.program-card .pg-risk{color:#f87171;font-size:0.82em;padding-left:14px}
+.program-card .pg-tip{color:#60a5fa;font-size:0.82em;padding-left:14px}
+.note-line{font-size:0.88em;color:#93a3b8;padding:2px 0 2px 10px;font-family:'Courier New',monospace}
+.section-divider{border:none;border-top:1px solid #1e3a5f;margin:20px 0}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:768px){.form-grid,.two-col{grid-template-columns:1fr}.metrics-row{grid-template-columns:1fr 1fr}}
+.layer-item{color:#f87171;font-size:0.88em;padding:2px 0 2px 16px;position:relative}
+.layer-item::before{content:"\25CF";position:absolute;left:2px;font-size:0.7em;top:5px}
+.guideline-table{width:100%;border-collapse:collapse;font-size:0.85em;margin:8px 0}
+.guideline-table th{text-align:left;color:#60a5fa;padding:6px 10px;border-bottom:1px solid #1e3a5f}
+.guideline-table td{padding:6px 10px;border-bottom:1px solid #0d1520;color:#93a3b8}
+.guideline-table td:first-child{color:#e0e0e0;font-weight:500;width:40%}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Automated Underwriting System</h1>
+<p class="subtitle">AUS Scoring Analysis &bull; Deal Structure Optimizer &bull; Program Strategy</p>
+
+<div class="panel" id="inputPanel">
+<h2>Borrower &amp; Deal Information</h2>
+
+<h3>Credit Profile</h3>
+<div class="form-grid">
+<div class="form-group"><label>Credit Score (FICO)</label><input type="number" id="creditScore" value="685" min="300" max="850"></div>
+<div class="form-group"><label>Co-Borrower Credit Score (0 if none)</label><input type="number" id="coCreditScore" value="0" min="0" max="850"></div>
+<div class="form-group"><label>Credit Card Utilization %</label><input type="number" id="utilization" value="42" min="0" max="100" step="1"></div>
+<div class="form-group"><label>Number of Tradelines</label><input type="number" id="tradelines" value="6" min="0"></div>
+<div class="form-group"><label>Oldest Tradeline (months)</label><input type="number" id="oldestTradeline" value="72" min="0"></div>
+<div class="form-group"><label>Late Payments (last 12 months)</label><input type="number" id="lates12" value="0" min="0"></div>
+<div class="form-group"><label>Late Payments (last 24 months)</label><input type="number" id="lates24" value="0" min="0"></div>
+<div class="form-group"><label>Months Since Bankruptcy (999=never)</label><input type="number" id="bkMonths" value="999" min="0"></div>
+<div class="form-group"><label>Months Since Foreclosure (999=never)</label><input type="number" id="fcMonths" value="999" min="0"></div>
+<div class="form-group"><label>Outstanding Collections $</label><input type="number" id="collections" value="0" min="0" step="100"></div>
+</div>
+
+<h3>Income &amp; Employment</h3>
+<div class="form-grid">
+<div class="form-group"><label>Monthly Gross Income $</label><input type="number" id="monthlyIncome" value="7500" min="0" step="100"></div>
+<div class="form-group"><label>Co-Borrower Monthly Income $</label><input type="number" id="coIncome" value="0" min="0" step="100"></div>
+<div class="form-group"><label>Self-Employed?</label><select id="selfEmployed"><option value="no" selected>No (W-2)</option><option value="yes">Yes</option></select></div>
+<div class="form-group"><label>Months at Current Job / Years Self-Employed</label><input type="number" id="empMonths" value="36" min="0"></div>
+</div>
+
+<h3>Monthly Debts</h3>
+<div class="form-grid">
+<div class="form-group"><label>Total Monthly Debt Payments (cards, auto, student, etc) $</label><input type="number" id="monthlyDebts" value="800" min="0" step="50"></div>
+</div>
+
+<h3>Property &amp; Deal</h3>
+<div class="form-grid">
+<div class="form-group"><label>Loan Purpose</label><select id="loanPurpose"><option value="purchase" selected>Purchase</option><option value="rate_term_refi">Rate/Term Refinance</option><option value="cash_out_refi">Cash-Out Refinance</option></select></div>
+<div class="form-group"><label>Occupancy</label><select id="occupancy"><option value="primary" selected>Primary Residence</option><option value="second_home">Second Home</option><option value="investment">Investment Property</option></select></div>
+<div class="form-group"><label>Property Type</label><select id="propType"><option value="sfr" selected>Single Family</option><option value="condo">Condo</option><option value="townhome">Townhome</option><option value="multi">2-4 Unit</option><option value="manufactured">Manufactured</option></select></div>
+<div class="form-group"><label>Purchase Price / Current Value $</label><input type="number" id="purchasePrice" value="425000" min="0" step="5000"></div>
+<div class="form-group"><label>Appraised Value $ (0 = same as price)</label><input type="number" id="appraisedValue" value="0" min="0" step="5000"></div>
+<div class="form-group"><label>Down Payment $</label><input type="number" id="downPayment" value="42500" min="0" step="1000"></div>
+<div class="form-group"><label>Loan Amount $ (0 = auto-calculate)</label><input type="number" id="loanAmount" value="0" min="0" step="1000"></div>
+<div class="form-group"><label>Proposed Monthly PITIA (P+I+Tax+Ins+HOA) $</label><input type="number" id="pitia" value="2650" min="0" step="50"></div>
+</div>
+
+<h3>Assets &amp; Reserves</h3>
+<div class="form-grid">
+<div class="form-group"><label>Total Liquid Assets (checking, savings, stocks) $</label><input type="number" id="liquidAssets" value="65000" min="0" step="1000"></div>
+<div class="form-group"><label>Retirement Assets (401k, IRA) $</label><input type="number" id="retirementAssets" value="25000" min="0" step="1000"></div>
+</div>
+
+<h3>Documentation</h3>
+<div class="form-grid">
+<div class="form-group"><label>Income Documentation</label><select id="docType"><option value="full" selected>Full Documentation (W-2, Tax Returns)</option><option value="bank_stmt">Bank Statements (Self-Employed)</option><option value="asset_depletion">Asset Depletion</option><option value="dscr">DSCR (Investment Property)</option></select></div>
+<div class="form-group"><label>Monthly Rental Income $ (investment only)</label><input type="number" id="rentalIncome" value="0" min="0" step="100"></div>
+</div>
+
+<button class="btn" onclick="runAnalysis()">ANALYZE DEAL</button>
+</div>
+
+<div id="results"></div>
+</div>
+
+<script>
+// ===================== SCORING ENGINE (JavaScript Port) =====================
+
+const CREDIT_TIERS = [
+  [780,850,"Excellent",-0.25,1.0],[740,779,"Very Good",0.0,0.95],[700,739,"Good",0.50,0.85],
+  [680,699,"Fair+",1.00,0.75],[660,679,"Fair",1.75,0.65],[640,659,"Below Avg",2.50,0.55],
+  [620,639,"Minimum Conv",3.25,0.45],[580,619,"FHA Territory",4.00,0.35],
+  [500,579,"Sub-prime",5.00,0.20],[300,499,"Deep Sub-prime",7.00,0.05]
+];
+
+const RESERVES_TIERS = [[0,0,0,"No reserves"],[1,2,5,"Minimal"],[3,5,15,"Adequate"],[6,11,30,"Strong"],[12,23,45,"Very strong"],[24,999,60,"Exceptional"]];
+
+function getInputs(){
+  const g=id=>parseFloat(document.getElementById(id).value)||0;
+  const v=id=>document.getElementById(id).value;
+  let d={};
+  d.creditScore=g('creditScore'); d.coCreditScore=g('coCreditScore');
+  d.utilization=g('utilization'); d.tradelines=g('tradelines');
+  d.oldestTradeline=g('oldestTradeline'); d.lates12=g('lates12');
+  d.lates24=g('lates24'); d.bkMonths=g('bkMonths'); d.fcMonths=g('fcMonths');
+  d.collections=g('collections'); d.monthlyIncome=g('monthlyIncome');
+  d.coIncome=g('coIncome'); d.selfEmployed=v('selfEmployed')==='yes';
+  d.empMonths=g('empMonths'); d.monthlyDebts=g('monthlyDebts');
+  d.loanPurpose=v('loanPurpose'); d.occupancy=v('occupancy');
+  d.propType=v('propType'); d.purchasePrice=g('purchasePrice');
+  d.appraisedValue=g('appraisedValue')||d.purchasePrice;
+  d.downPayment=g('downPayment');
+  d.loanAmount=g('loanAmount')||(d.purchasePrice-d.downPayment);
+  d.pitia=g('pitia'); d.liquidAssets=g('liquidAssets');
+  d.retirementAssets=g('retirementAssets'); d.docType=v('docType');
+  d.rentalIncome=g('rentalIncome');
+  d.repScore=d.coCreditScore>0?Math.min(d.creditScore,d.coCreditScore):d.creditScore;
+  d.totalIncome=d.monthlyIncome+d.coIncome;
+  return d;
+}
+
+function scoreCredit(d){
+  let max=100,pts=0,tier="",llpa=0,actions=[];
+  for(let t of CREDIT_TIERS){
+    if(d.repScore>=t[0]&&d.repScore<=t[1]){pts=t[4]*max;tier=t[2];llpa=t[3];break;}
+  }
+  if(d.repScore<740)actions.push("Target 740+ for best pricing (currently "+d.repScore+")");
+  if(d.utilization>30)actions.push("Reduce utilization from "+d.utilization+"% to <30%");
+  if(d.repScore<620){actions.push("Consider FHA (580 min) or VA");actions.push("Consider Non-QM products");}
+  let risk=pts>=75?"LOW":pts>=50?"MODERATE":pts>=30?"HIGH":"VERY HIGH";
+  return{cat:"Credit",name:"Credit Score Tier",value:d.repScore+" ("+tier+")",pts:Math.round(pts*10)/10,max:max,risk:risk,
+    expl:"Representative FICO "+d.repScore+" in '"+tier+"' tier. LLPA adjustment: "+(llpa>=0?"+":"")+llpa.toFixed(2)+"%",actions:actions};
+}
+
+function scoreCreditHistory(d){
+  let max=60,pts=max,actions=[];
+  pts-=d.lates12*20; pts-=d.lates24*8;
+  if(d.bkMonths<48){pts-=30;actions.push("Wait "+(48-d.bkMonths)+" more months post-BK for conventional");actions.push("FHA allows 24 months post-BK discharge");}
+  if(d.bkMonths<24)pts-=20;
+  if(d.fcMonths<84){pts-=25;actions.push("Wait "+(84-d.fcMonths)+" more months post-foreclosure (conventional)");actions.push("FHA allows 36 months post-foreclosure");}
+  if(d.collections>2000){pts-=10;actions.push("Pay/settle collections over $2,000 (current: $"+d.collections.toLocaleString()+")");}
+  else if(d.collections>0)pts-=3;
+  if(d.lates12>0)actions.push("Establish 12 months of perfect payment history");
+  pts=Math.max(0,pts);
+  let risk=pts>=45?"LOW":pts>=30?"MODERATE":"HIGH";
+  return{cat:"Credit",name:"Credit History / Derogatory Events",
+    value:"Late 12mo: "+d.lates12+", Late 24mo: "+d.lates24+", BK: "+d.bkMonths+"mo, FC: "+d.fcMonths+"mo",
+    pts:Math.round(pts*10)/10,max:max,risk:risk,
+    expl:"AUS heavily penalizes recent lates, BK, and foreclosure.",actions:actions};
+}
+
+function scoreCreditDepth(d){
+  let max=30,pts=0,actions=[];
+  if(d.tradelines>=5)pts+=15;else if(d.tradelines>=3)pts+=10;else{pts+=3;actions.push("Build credit depth: add authorized user or secured cards (currently "+d.tradelines+" tradelines)");}
+  if(d.oldestTradeline>=84)pts+=15;else if(d.oldestTradeline>=48)pts+=10;else if(d.oldestTradeline>=24)pts+=5;else{pts+=1;actions.push("Thin/new credit file - consider authorized user on seasoned account");}
+  let risk=pts>=22?"LOW":pts>=12?"MODERATE":"HIGH";
+  return{cat:"Credit",name:"Credit Depth / File Thickness",value:d.tradelines+" tradelines, oldest "+d.oldestTradeline+" months",
+    pts:Math.round(pts*10)/10,max:max,risk:risk,expl:"DU/LP reward thick files with seasoned tradelines.",actions:actions};
+}
+
+function scoreUtilization(d){
+  let max=40,pts=0,actions=[],u=d.utilization;
+  if(u<=10)pts=40;else if(u<=20)pts=35;else if(u<=30)pts=28;
+  else if(u<=50){pts=18;actions.push("Pay down revolving balances from "+u+"% to <30% utilization");}
+  else if(u<=70){pts=10;actions.push("Pay down revolving balances from "+u+"% to <30% utilization");}
+  else{pts=3;actions.push("CRITICAL: Utilization at "+u+"% - pay down to <30% before applying");actions.push("Each 10% reduction can boost FICO 10-30 points");}
+  let risk=pts>=28?"LOW":pts>=18?"MODERATE":"HIGH";
+  return{cat:"Credit",name:"Credit Utilization",value:u.toFixed(1)+"%",pts:Math.round(pts*10)/10,max:max,risk:risk,
+    expl:"Utilization is the #1 quickest lever to move FICO.",actions:actions};
+}
+
+function scoreDTI(d){
+  let max=100,actions=[];
+  let frontDTI=d.totalIncome>0?(d.pitia/d.totalIncome)*100:0;
+  let backDTI=d.totalIncome>0?((d.pitia+d.monthlyDebts)/d.totalIncome)*100:0;
+  let pts=0;
+  if(backDTI<=28)pts=100;else if(backDTI<=33)pts=90;else if(backDTI<=36)pts=80;else if(backDTI<=40)pts=65;
+  else if(backDTI<=43){pts=50;actions.push("At 43% DTI - right at QM limit. Pay off smallest debts to create cushion.");}
+  else if(backDTI<=45){pts=35;actions.push("Over 43% QM limit - need strong compensating factors");actions.push("Consider paying off debts to bring DTI below 43%");}
+  else if(backDTI<=50){pts=20;actions.push("DTI 45-50% requires DU Approve with 2+ compensating factors");
+    let target=d.totalIncome*0.43,curr=d.pitia+d.monthlyDebts,red=curr-target;
+    if(red>0)actions.push("Reduce monthly debts by $"+Math.round(red).toLocaleString()+"/mo to reach 43% DTI (pay off ~$"+Math.round(red*30).toLocaleString()+")");}
+  else{pts=5;actions.push("DTI "+backDTI.toFixed(1)+"% exceeds most program limits");
+    let target=d.totalIncome*0.43,curr=d.pitia+d.monthlyDebts,red=curr-target;
+    if(red>0)actions.push("Reduce monthly debts by $"+Math.round(red).toLocaleString()+"/mo to reach 43%");
+    actions.push("Consider adding co-borrower income");actions.push("Explore Non-QM or bank statement programs");}
+  let risk=pts>=65?"LOW":pts>=40?"MODERATE":pts>=20?"HIGH":"VERY HIGH";
+  return{cat:"Capacity",name:"Debt-to-Income Ratio (Back-End)",value:backDTI.toFixed(1)+"%",pts:Math.round(pts*10)/10,max:max,risk:risk,
+    expl:"Back-end DTI at "+backDTI.toFixed(1)+"%. QM limit 43%, DU can go to 50%, FHA to 57%.",actions:actions,frontDTI:frontDTI,backDTI:backDTI};
+}
+
+function scoreLTV(d){
+  let max=80,actions=[];
+  let value=d.loanPurpose==='purchase'?Math.min(d.purchasePrice,d.appraisedValue):d.appraisedValue;
+  let ltv=value>0?(d.loanAmount/value)*100:0;
+  let pts=0;
+  if(ltv<=60)pts=80;else if(ltv<=70)pts=70;else if(ltv<=75)pts=60;else if(ltv<=80)pts=50;
+  else if(ltv<=85){pts=35;actions.push("LTV >80% requires PMI");}
+  else if(ltv<=90){pts=25;actions.push("Consider increasing down payment to 20% to eliminate PMI");}
+  else if(ltv<=95){pts=15;actions.push("High LTV - limited programs; credit score must be strong");actions.push("Consider gift funds or DPA programs");}
+  else{pts=5;actions.push("LTV >95% - only VA 100%, USDA 100%, or conv 97%");if(d.creditScore<680)actions.push("At this LTV, most lenders want 680+ FICO");}
+  let risk=pts>=50?"LOW":pts>=30?"MODERATE":"HIGH";
+  return{cat:"Collateral",name:"Loan-to-Value Ratio",value:ltv.toFixed(1)+"%",pts:Math.round(pts*10)/10,max:max,risk:risk,
+    expl:"LTV at "+ltv.toFixed(1)+"%. Lower LTV = better pricing, more options.",actions:actions,ltv:ltv};
+}
+
+function scoreReserves(d){
+  let max=60,actions=[];
+  let effectiveAssets=d.liquidAssets+(d.retirementAssets*0.6);
+  let reservesAfter=effectiveAssets-d.downPayment;
+  let months=d.pitia>0?Math.max(0,reservesAfter/d.pitia):0;
+  let pts=0,label="No reserves";
+  for(let t of RESERVES_TIERS){if(months>=t[0]&&months<=t[1]){pts=t[2];label=t[3];break;}}
+  if(months<2){actions.push("Build up at least 2 months PITIA in reserves");actions.push("6+ months reserves is a key compensating factor");}
+  else if(months<6)actions.push("Currently "+months.toFixed(1)+" months - build to 6+ for compensating factor credit");
+  if(d.occupancy==='investment'&&months<6)actions.push("Investment property requires minimum 6 months reserves");
+  let risk=pts>=30?"LOW":pts>=15?"MODERATE":"HIGH";
+  return{cat:"Capital",name:"Reserves (Months PITIA)",value:months.toFixed(1)+" months ("+label+")",pts:Math.round(pts*10)/10,max:max,risk:risk,
+    expl:months.toFixed(1)+" months reserves. DU gives significant weight to reserves.",actions:actions,months:months};
+}
+
+function scoreEmployment(d){
+  let max=40,actions=[],pts=0;
+  if(d.selfEmployed){
+    let yrs=Math.floor(d.empMonths/12);
+    if(yrs>=5)pts=35;else if(yrs>=2)pts=25;else{pts=10;actions.push("Self-employed <2 years is difficult - most lenders require 2+ years");actions.push("Consider bank statement programs");}
+  }else{
+    if(d.empMonths>=24)pts=40;else if(d.empMonths>=12)pts=30;
+    else if(d.empMonths>=6){pts=20;actions.push("Less than 2 years at current job - document prior employment");}
+    else{pts=10;actions.push("Employment <6 months - high risk. Document job offer letter, prior history.");}
+  }
+  let risk=pts>=30?"LOW":pts>=20?"MODERATE":"HIGH";
+  return{cat:"Capacity",name:"Employment Stability",value:(d.selfEmployed?"Self-employed":"W-2")+" - "+d.empMonths+" months",
+    pts:Math.round(pts*10)/10,max:max,risk:risk,expl:"AUS rewards employment longevity. 2+ years ideal.",actions:actions};
+}
+
+function scorePropertyType(d){
+  let max=20,actions=[];
+  let map={sfr:[20,"LOW","Single-family is lowest risk."],townhome:[18,"LOW","Townhomes score nearly as well as SFR."],
+    condo:[14,"MODERATE","Condos have LLPA hits, need warrantable status."],multi:[10,"MODERATE","2-4 unit has additional reserve requirements."],
+    manufactured:[6,"HIGH","Manufactured homes have very limited options."]};
+  let m=map[d.propType]||[10,"MODERATE",""];
+  if(d.propType==='condo')actions.push("Ensure condo project is warrantable");
+  if(d.propType==='manufactured')actions.push("Verify HUD standards and permanent foundation");
+  return{cat:"Collateral",name:"Property Type",value:d.propType,pts:m[0],max:max,risk:m[1],expl:m[2],actions:actions};
+}
+
+function scoreOccupancy(d){
+  let max=20,actions=[];
+  let map={primary:[20,"LOW","Owner-occupied is the gold standard."],second_home:[12,"MODERATE","Second home has LLPA add-ons."],
+    investment:[6,"HIGH","Investment properties have highest rates, lowest LTV."]};
+  let m=map[d.occupancy]||[10,"MODERATE",""];
+  if(d.occupancy==='investment'){actions.push("Expect 0.5-1.5% higher rate vs primary");actions.push("Consider house-hacking to qualify as primary");}
+  return{cat:"Collateral",name:"Occupancy Type",value:d.occupancy,pts:m[0],max:max,risk:m[1],expl:m[2],actions:actions};
+}
+
+function scoreLoanPurpose(d){
+  let max=15,actions=[];
+  let map={purchase:[15,"LOW","Purchase has best AUS treatment."],rate_term_refi:[12,"LOW","Rate/term refi scores well."],
+    cash_out_refi:[6,"MODERATE","Cash-out refi has LLPA hits, lower max LTV."]};
+  let m=map[d.loanPurpose]||[10,"MODERATE",""];
+  if(d.loanPurpose==='cash_out_refi'){actions.push("Cash-out max 80% LTV primary, 75% investment");actions.push("Consider rate/term refi + HELOC instead");}
+  return{cat:"Deal Structure",name:"Loan Purpose",value:d.loanPurpose,pts:m[0],max:max,risk:m[1],expl:m[2],actions:actions};
+}
+
+function scoreDocType(d){
+  let max=15,actions=[];
+  let map={full:[15,"LOW","Full documentation - strongest AUS treatment."],bank_stmt:[8,"MODERATE","Bank statement loans are Non-QM - higher rates."],
+    asset_depletion:[6,"MODERATE","Asset depletion - works for retirees."],dscr:[5,"HIGH","DSCR - purely property cash flow based."]};
+  let m=map[d.docType]||[10,"MODERATE",""];
+  if(d.docType!=='full')actions.push("Full doc always gets best AUS treatment if available");
+  return{cat:"Documentation",name:"Income Documentation",value:d.docType,pts:m[0],max:max,risk:m[1],expl:m[2],actions:actions};
+}
+// ===================== MAIN ANALYSIS =====================
+
+function runAnalysis(){
+  let d=getInputs();
+  let factors=[];
+  let compensating=[];
+  let riskFlags=[];
+
+  // Score all factors
+  let creditF=scoreCredit(d); factors.push(creditF);
+  let historyF=scoreCreditHistory(d); factors.push(historyF);
+  if(d.lates12>0)riskFlags.push("Late payments in last 12 months ("+d.lates12+"x)");
+  if(d.bkMonths<48)riskFlags.push("Bankruptcy "+d.bkMonths+" months ago (need 48+ for conventional)");
+  if(d.fcMonths<84)riskFlags.push("Foreclosure "+d.fcMonths+" months ago (need 84+ for conventional)");
+  let depthF=scoreCreditDepth(d); factors.push(depthF);
+  let utilF=scoreUtilization(d); factors.push(utilF);
+  let dtiF=scoreDTI(d); factors.push(dtiF);
+  let ltvF=scoreLTV(d); factors.push(ltvF);
+  let resF=scoreReserves(d); factors.push(resF);
+  let empF=scoreEmployment(d); factors.push(empF);
+  let propF=scorePropertyType(d); factors.push(propF);
+  let occF=scoreOccupancy(d); factors.push(occF);
+  let purpF=scoreLoanPurpose(d); factors.push(purpF);
+  let docF=scoreDocType(d); factors.push(docF);
+
+  // Compensating factors
+  if(resF.months>=6)compensating.push("Strong reserves: "+resF.months.toFixed(1)+" months PITIA");
+  if(d.empMonths>=24)compensating.push("Stable employment: "+Math.floor(d.empMonths/12)+"+ years");
+  let residual=d.totalIncome-(d.pitia+d.monthlyDebts);
+  if(residual>2500)compensating.push("Strong residual income: $"+Math.round(residual).toLocaleString()+"/mo after all debts");
+  if(d.creditScore>=740)compensating.push("Excellent credit: "+d.creditScore);
+  if(dtiF.backDTI<=36)compensating.push("Conservative DTI: "+dtiF.backDTI.toFixed(1)+"%");
+  if(ltvF.ltv<=75)compensating.push("Strong equity position: "+(100-ltvF.ltv).toFixed(1)+"% equity");
+  if(d.totalIncome>0&&d.downPayment>0&&(d.downPayment/d.totalIncome)<=12)compensating.push("Down payment < 12 months income (ability to save)");
+
+  // Totals
+  let totalScore=factors.reduce((s,f)=>s+f.pts,0);
+  let maxScore=factors.reduce((s,f)=>s+f.max,0);
+  let scorePct=maxScore>0?(totalScore/maxScore)*100:0;
+
+  // LLPA estimate
+  let llpa=0;
+  for(let t of CREDIT_TIERS){if(d.creditScore>=t[0]&&d.creditScore<=t[1]){llpa+=t[3];break;}}
+  if(ltvF.ltv>95)llpa+=0.75;else if(ltvF.ltv>90)llpa+=0.50;else if(ltvF.ltv>80)llpa+=0.25;
+  if(d.loanPurpose==='cash_out_refi')llpa+=0.375;
+  if(d.occupancy==='investment')llpa+=1.125;else if(d.occupancy==='second_home')llpa+=0.625;
+  if(d.propType==='condo')llpa+=0.25;else if(d.propType==='manufactured')llpa+=0.50;else if(d.propType==='multi')llpa+=0.25;
+
+  // Recommendation
+  let rec="Refer with Caution/Ineligible";
+  if(d.bkMonths<24&&d.docType==='full')rec="Out of Scope";
+  else if(d.fcMonths<36)rec="Out of Scope";
+  else if(scorePct>=70&&dtiF.backDTI<=50&&riskFlags.length===0)rec="Approve/Eligible";
+  else if(scorePct>=60&&dtiF.backDTI<=50&&compensating.length>=2)rec="Approve/Eligible";
+  else if(scorePct>=55&&dtiF.backDTI<=55)rec="Approve/Ineligible";
+  else if(scorePct>=40)rec="Refer with Caution/Eligible";
+
+  // Approval probability
+  let prob=scorePct;
+  if(dtiF.backDTI>50)prob-=25;else if(dtiF.backDTI>45)prob-=15;else if(dtiF.backDTI>43)prob-=8;
+  if(ltvF.ltv>95)prob-=15;else if(ltvF.ltv>90)prob-=8;
+  prob-=riskFlags.length*8;
+  prob+=Math.min(compensating.length*3,15);
+  if(d.creditScore<620)prob-=20;else if(d.creditScore<660)prob-=10;
+  prob=Math.max(1,Math.min(99,prob));
+
+  // Risk layers
+  let layers=[];
+  if(d.creditScore<680)layers.push("Low credit score ("+d.creditScore+")");
+  if(d.utilization>50)layers.push("High utilization ("+d.utilization+"%)");
+  if(d.lates12>0)layers.push("Recent delinquency ("+d.lates12+" lates in 12mo)");
+  if(d.tradelines<3)layers.push("Thin credit file ("+d.tradelines+" tradelines)");
+  if(dtiF.backDTI>43)layers.push("High DTI ("+dtiF.backDTI.toFixed(1)+"%)");
+  if(ltvF.ltv>80)layers.push("High LTV ("+ltvF.ltv.toFixed(1)+"%)");
+  if(d.propType==='condo'||d.propType==='manufactured'||d.propType==='multi')layers.push("Higher-risk property type ("+d.propType+")");
+  if(d.occupancy==='investment')layers.push("Investment property");
+  else if(d.occupancy==='second_home')layers.push("Second home");
+  if(resF.months<2)layers.push("Low reserves ("+resF.months.toFixed(1)+" months)");
+  if(d.loanPurpose==='cash_out_refi')layers.push("Cash-out refinance");
+  if(d.docType!=='full')layers.push("Non-full documentation ("+d.docType+")");
+  if(d.selfEmployed&&d.empMonths<24)layers.push("Self-employed <2 years");
+
+  // Program eligibility
+  let programs=evaluatePrograms(d,dtiF.backDTI,ltvF.ltv);
+
+  // Deal structure notes
+  let dealNotes=buildDealNotes(d,dtiF,ltvF,resF,compensating,riskFlags);
+
+  // Optimization scenarios
+  let scenarios=buildScenarios(d,dtiF,ltvF,resF,scorePct,prob);
+
+  // RENDER
+  renderResults(d,factors,compensating,riskFlags,totalScore,maxScore,scorePct,rec,prob,dtiF,ltvF,llpa,layers,programs,dealNotes,scenarios);
+}
+
+function evaluatePrograms(d,backDTI,ltv){
+  let programs=[];
+  // DU
+  let duElig=true,duConf="High",duRisks=[],duAdv=[],duTips=[];
+  if(d.creditScore<620){duElig=false;duRisks.push("FICO below DU minimum 620");}
+  if(backDTI>50){duElig=false;duRisks.push("DTI exceeds DU max 50%");}else if(backDTI>45)duConf="Medium";
+  if(d.bkMonths<48){duElig=false;duRisks.push("BK too recent (need 48+ months)");}
+  if(d.fcMonths<84){duElig=false;duRisks.push("Foreclosure too recent (need 84+ months)");}
+  let duMaxLTV=d.occupancy==='primary'?97:d.occupancy==='second_home'?90:85;
+  if(d.loanPurpose==='cash_out_refi')duMaxLTV=d.occupancy==='primary'?80:75;
+  if(ltv>duMaxLTV){duElig=false;duRisks.push("LTV "+ltv.toFixed(1)+"% exceeds "+duMaxLTV+"% limit");}
+  duAdv.push("Most widely used AUS");duAdv.push("DTI up to 50% with comp factors");duAdv.push("97% LTV on primary purchase");
+  duTips.push("Submit DU FIRST before LP");duTips.push("DU allows resubmission - fix issues and rerun");
+  programs.push({name:"Desktop Underwriter (Fannie Mae)",eligible:duElig,confidence:duConf,maxDTI:50,maxLTV:duMaxLTV,minFICO:620,risks:duRisks,advantages:duAdv,tips:duTips,rateAdj:0});
+
+  // LP
+  let lpElig=duElig,lpConf=duConf,lpRisks=[...duRisks],lpAdv=[],lpTips=[];
+  lpAdv.push("Different algorithm - may approve files DU refers");lpAdv.push("Better treatment of non-traditional credit");lpAdv.push("LP Accept on borderline DTI where DU gives Refer");
+  lpTips.push("Always run LP if DU returns Refer");lpTips.push("LP Accept = DU Approve/Eligible");
+  programs.push({name:"Loan Product Advisor (Freddie Mac)",eligible:lpElig,confidence:lpConf,maxDTI:50,maxLTV:duMaxLTV,minFICO:620,risks:lpRisks,advantages:lpAdv,tips:lpTips,rateAdj:0});
+
+  // FHA
+  let fhaElig=true,fhaConf="High",fhaRisks=[],fhaAdv=[],fhaTips=[];
+  if(d.creditScore<500){fhaElig=false;fhaRisks.push("FICO below FHA floor 500");}
+  else if(d.creditScore<580)fhaConf="Medium";
+  if(backDTI>57){fhaElig=false;fhaRisks.push("DTI exceeds FHA max 57%");}else if(backDTI>50)fhaConf="Medium";
+  if(d.bkMonths<24){fhaElig=false;fhaRisks.push("BK too recent for FHA (need 24 months)");}
+  if(d.fcMonths<36){fhaElig=false;fhaRisks.push("Foreclosure too recent for FHA (need 36 months)");}
+  if(d.occupancy==='investment'){fhaElig=false;fhaRisks.push("FHA does not allow investment properties");}
+  if(d.occupancy==='second_home'){fhaElig=false;fhaRisks.push("FHA does not allow second homes");}
+  fhaAdv.push("580+ FICO with 3.5% down");fhaAdv.push("DTI up to 57% with comp factors");fhaAdv.push("More lenient on BK/FC seasoning");fhaAdv.push("Manual underwrite option if TOTAL Refers");
+  fhaRisks.push("MIP for life of loan if <10% down");fhaRisks.push("Upfront MIP 1.75%");
+  fhaTips.push("FHA TOTAL weighs credit history heavily");fhaTips.push("If TOTAL Refers, file can be manually underwritten");fhaTips.push("FHA allows non-occupant co-borrowers");
+  programs.push({name:"FHA TOTAL Scorecard",eligible:fhaElig,confidence:fhaConf,maxDTI:57,maxLTV:96.5,minFICO:580,risks:fhaRisks,advantages:fhaAdv,tips:fhaTips,rateAdj:0.006});
+
+  // VA
+  let vaElig=true,vaConf="Medium",vaRisks=[],vaAdv=[],vaTips=[];
+  if(d.creditScore<580){vaConf="Low";vaRisks.push("Most VA lenders require 580+ FICO");}
+  if(d.occupancy==='investment'){vaElig=false;vaRisks.push("VA requires owner-occupancy");}
+  if(d.bkMonths<24)vaRisks.push("VA typically requires 24 months post-BK");
+  if(d.fcMonths<24)vaRisks.push("VA typically requires 24 months post-foreclosure");
+  vaAdv.push("0% down payment - 100% financing");vaAdv.push("NO PMI/MIP");vaAdv.push("No hard DTI limit - uses residual income");vaAdv.push("No FICO floor from VA");
+  vaTips.push("Get Certificate of Eligibility (COE) first");vaTips.push("Residual income: $"+Math.round(d.totalIncome-(d.pitia+d.monthlyDebts)).toLocaleString()+"/mo");vaTips.push("Disabled veterans exempt from funding fee");
+  programs.push({name:"VA Automated (WebLGY)",eligible:vaElig,confidence:vaConf,maxDTI:60,maxLTV:100,minFICO:580,risks:vaRisks,advantages:vaAdv,tips:vaTips,rateAdj:-0.25});
+
+  // Sort eligible first, then by confidence
+  let confOrder={High:3,Medium:2,Low:1};
+  programs.sort((a,b)=>{
+    if(a.eligible&&!b.eligible)return -1;if(!a.eligible&&b.eligible)return 1;
+    return(confOrder[b.confidence]||0)-(confOrder[a.confidence]||0);
+  });
+  return programs;
+}
+
+function buildDealNotes(d,dtiF,ltvF,resF,compensating,riskFlags){
+  let notes=[];
+  notes.push("<strong>BEST PROGRAM FIT</strong>");
+  if(d.creditScore>=620&&dtiF.backDTI<=50&&ltvF.ltv<=97)
+    notes.push("CONVENTIONAL (Fannie/Freddie) - Run through DU first, then LP"+(ltvF.ltv>80?" | PMI required - shop BPMI vs LPMI":""));
+  if(d.creditScore>=580&&dtiF.backDTI<=57)
+    notes.push("FHA - More forgiving on DTI (up to 57%) and credit (580+) | MIP 1.75% upfront");
+  notes.push("VA (if eligible) - 0% down, no PMI, residual income model");
+
+  if(dtiF.backDTI>43){
+    notes.push("");notes.push("<strong>DTI REDUCTION STRATEGIES</strong>");
+    let target=d.totalIncome*0.43,curr=d.pitia+d.monthlyDebts,excess=curr-target;
+    notes.push("Current back-end DTI: "+dtiF.backDTI.toFixed(1)+"%");
+    notes.push("Need to eliminate $"+Math.round(excess).toLocaleString()+"/mo in payments to hit 43%");
+    notes.push("1. Pay off revolving debts (~$"+Math.round(excess*25).toLocaleString()+")");
+    notes.push("2. Add co-borrower income of $"+Math.round(excess).toLocaleString()+"/mo");
+    notes.push("3. Increase down payment to reduce loan amount/PITIA");
+    notes.push("4. Buy down rate to reduce monthly P&I");
+  }
+
+  if(d.creditScore<740){
+    notes.push("");notes.push("<strong>CREDIT OPTIMIZATION</strong>");
+    notes.push("Current FICO: "+d.creditScore);
+    if(d.utilization>30)notes.push("[HIGH IMPACT] Reduce utilization from "+d.utilization+"% to <10% -> Expected FICO boost: +20 to +50 points");
+    if(d.lates12>0)notes.push("[HIGH IMPACT] Wait for 12 months clean payment history");
+    if(d.tradelines<3)notes.push("[MEDIUM IMPACT] Add authorized user on seasoned account");
+    notes.push("Target: 620 (conv min), 660, 680, 700, 720, 740 (best pricing)");
+  }
+
+  if(ltvF.ltv>80){
+    notes.push("");notes.push("<strong>DOWN PAYMENT / LTV STRATEGIES</strong>");
+    let value=d.loanPurpose==='purchase'?Math.min(d.purchasePrice,d.appraisedValue):d.appraisedValue;
+    let addlDown=d.loanAmount-(value*0.80);
+    notes.push("Current LTV: "+ltvF.ltv.toFixed(1)+"%");
+    notes.push("Additional $"+Math.round(addlDown).toLocaleString()+" down payment reaches 80% LTV (no PMI)");
+    notes.push("Sources: Gift funds, DPA programs, employer assistance, 401k loan, seller concessions");
+  }
+
+  if(resF.months<6){
+    notes.push("");notes.push("<strong>RESERVES BUILDING</strong>");
+    notes.push("Current: "+resF.months.toFixed(1)+" months | Target: 6+ months");
+    if(d.pitia>0){let needed=(6-resF.months)*d.pitia;notes.push("Need ~$"+Math.round(needed).toLocaleString()+" more in liquid assets");}
+  }
+
+  notes.push("");notes.push("<strong>AUS SUBMISSION ORDER</strong>");
+  notes.push("1. Run DU first (most flexible on DTI)");
+  notes.push("2. If DU Refers, run LP (different algorithm)");
+  notes.push("3. If both Refer, check FHA/VA eligibility");
+  notes.push("4. If government doesn't work, explore Non-QM");
+  notes.push("5. Re-run AUS after any credit/debt changes");
+
+  return notes;
+}
+
+function buildScenarios(d,dtiF,ltvF,resF,scorePct,prob){
+  let scenarios=[];
+
+  if(d.utilization>30){
+    for(let target of [30,20,10]){
+      if(target<d.utilization){
+        let boost=Math.round((d.utilization-target)*0.7);
+        scenarios.push({name:"Reduce utilization to "+target+"%",
+          desc:"Pay down revolving balances. Est FICO boost: +"+boost+" pts -> "+(d.creditScore+boost),
+          difficulty:target<=10?"Moderate":"Easy",time:"1-2 weeks",impact:"+"+Math.round(boost*0.4)+"% approval probability"});
+      }
+    }
+  }
+
+  if(dtiF.backDTI>43){
+    for(let[targetDTI,label] of [[43,"QM limit"],[40,"Strong"],[36,"Ideal"]]){
+      let targetDebt=d.totalIncome*(targetDTI/100),curr=d.pitia+d.monthlyDebts,red=curr-targetDebt;
+      if(red>0)scenarios.push({name:"Reduce DTI to "+targetDTI+"% ("+label+")",
+        desc:"Pay off ~$"+Math.round(red*25).toLocaleString()+" in debts to reduce payments by $"+Math.round(red).toLocaleString()+"/mo",
+        difficulty:red*25<10000?"Moderate":"Hard",time:red*25<5000?"Immediate":"1-3 months",impact:"+"+Math.round(red/10)+"% approval probability"});
+    }
+    if(d.coIncome===0){
+      let needed=(d.pitia+d.monthlyDebts)/0.43-d.totalIncome;
+      scenarios.push({name:"Add co-borrower/non-occupant co-signer",desc:"Adding $"+Math.round(needed).toLocaleString()+"/mo income brings DTI to 43%",
+        difficulty:"Moderate",time:"1-2 weeks",impact:"+15-20% approval probability"});
+    }
+  }
+
+  if(ltvF.ltv>80){
+    let value=d.loanPurpose==='purchase'?Math.min(d.purchasePrice,d.appraisedValue):d.appraisedValue;
+    let target80=value*0.80,addlDown=d.loanAmount-target80;
+    scenarios.push({name:"Increase down payment to 80% LTV (no PMI)",desc:"Add $"+Math.round(addlDown).toLocaleString()+" to down payment. Eliminates PMI.",
+      difficulty:addlDown>20000?"Hard":"Moderate",time:"1-3 months",impact:"+10-15% approval probability"});
+    scenarios.push({name:"Gift funds to reach 80% LTV",desc:"Receive $"+Math.round(addlDown).toLocaleString()+" gift from family. Need gift letter + donor bank statements.",
+      difficulty:"Moderate",time:"1-2 weeks",impact:"+10-15% approval probability"});
+  }
+
+  if(resF.months<6)
+    scenarios.push({name:"Build reserves to 6+ months",desc:"Key DU compensating factor. Need ~$"+Math.round((6-resF.months)*d.pitia).toLocaleString()+" more in liquid assets.",
+      difficulty:"Moderate",time:"1-3 months",impact:"+8-12% approval probability"});
+
+  if(d.tradelines<5)
+    scenarios.push({name:"Add authorized user tradeline",desc:"Get added to seasoned account. Est FICO boost: +8-15 pts. Immediate credit depth improvement.",
+      difficulty:"Easy",time:"1-2 weeks",impact:"+5-10% approval probability"});
+
+  scenarios.push({name:"Rapid rescore",desc:"Pay down cards, then have LO submit rapid rescore (3-5 business days). Reflects new balances immediately.",
+    difficulty:"Easy",time:"1-2 weeks",impact:"Varies based on utilization reduction"});
+
+  if(d.selfEmployed)
+    scenarios.push({name:"Switch to bank statement program",desc:"Use 12-24 month bank statement deposits instead of tax returns. Often shows higher qualifying income.",
+      difficulty:"Easy",time:"1-2 weeks",impact:"Higher qualifying income"});
+
+  return scenarios;
+}
+// ===================== RENDER RESULTS =====================
+
+function renderResults(d,factors,compensating,riskFlags,totalScore,maxScore,scorePct,rec,prob,dtiF,ltvF,llpa,layers,programs,dealNotes,scenarios){
+  let recClass=rec.includes("Approve/Eligible")?"rec-approve":rec.includes("Approve")?"rec-approve":rec.includes("Refer")?"rec-refer":rec.includes("Out of Scope")?"rec-oos":"rec-ineligible";
+  let probClass=prob>=70?"val-good":prob>=50?"val-warn":"val-bad";
+  let scoreClass=scorePct>=70?"val-good":scorePct>=50?"val-warn":"val-bad";
+
+  let html='<div class="panel"><h2>AUS SCORING ANALYSIS</h2>';
+  html+='<div style="text-align:center;margin:16px 0"><span class="rec-badge '+recClass+'">'+rec+'</span></div>';
+
+  html+='<div class="metrics-row">';
+  html+='<div class="metric-card"><div class="lbl">Overall Score</div><div class="val '+scoreClass+'">'+Math.round(totalScore)+' / '+maxScore+'</div><div class="lbl">'+scorePct.toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Approval Probability</div><div class="val '+probClass+'">'+prob.toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Front-End DTI</div><div class="val">'+(dtiF.frontDTI).toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Back-End DTI</div><div class="val '+(dtiF.backDTI<=43?"val-good":dtiF.backDTI<=50?"val-warn":"val-bad")+'">'+(dtiF.backDTI).toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">LTV</div><div class="val '+(ltvF.ltv<=80?"val-good":ltvF.ltv<=90?"val-warn":"val-bad")+'">'+ltvF.ltv.toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Est. LLPA</div><div class="val '+(llpa<=0.5?"val-good":llpa<=1.5?"val-warn":"val-bad")+'">'+(llpa>=0?"+":"")+llpa.toFixed(3)+'%</div></div>';
+  html+='</div>';
+
+  // Factor breakdown
+  html+='<h3>Scoring Breakdown</h3>';
+  for(let f of factors){
+    let pct=f.max>0?(f.pts/f.max)*100:0;
+    let riskCls=f.risk==="LOW"?"risk-low":f.risk==="MODERATE"?"risk-mod":f.risk==="HIGH"?"risk-high":"risk-vhigh";
+    let barCls=pct>=70?"bar-good":pct>=50?"bar-warn":"bar-bad";
+    let riskColor=f.risk==="LOW"?"val-good":f.risk==="MODERATE"?"val-warn":"val-bad";
+    html+='<div class="factor-row '+riskCls+'">';
+    html+='<div class="factor-header"><span class="factor-name">'+f.cat+' &rsaquo; '+f.name+'</span><span class="factor-score '+riskColor+'">'+f.pts+'/'+f.max+' ('+Math.round(pct)+'%)</span></div>';
+    html+='<div class="factor-value">'+f.value+'</div>';
+    html+='<div class="bar-container"><div class="bar-fill '+barCls+'" style="width:'+Math.min(100,pct)+'%"></div></div>';
+    html+='<div class="factor-explanation">'+f.expl+'</div>';
+    for(let a of f.actions)html+='<div class="action-item">'+a+'</div>';
+    html+='</div>';
+  }
+
+  // Compensating factors
+  if(compensating.length>0){
+    html+='<h3>Compensating Factors (Working in Your Favor)</h3>';
+    for(let c of compensating)html+='<div class="comp-factor">'+c+'</div>';
+  }
+  // Risk flags
+  if(riskFlags.length>0){
+    html+='<h3>Risk Flags (Must Address)</h3>';
+    for(let r of riskFlags)html+='<div class="risk-flag">'+r+'</div>';
+  }
+  html+='</div>';
+
+  // Deal structure
+  html+='<div class="panel"><h2>DEAL STRUCTURE RECOMMENDATIONS</h2>';
+  for(let n of dealNotes){
+    if(n==='')html+='<hr class="section-divider">';
+    else if(n.startsWith('<strong>'))html+='<h3>'+n+'</h3>';
+    else html+='<div class="note-line">'+n+'</div>';
+  }
+  html+='</div>';
+
+  // Optimization
+  html+='<div class="panel"><h2>DEAL OPTIMIZATION SCENARIOS</h2>';
+  html+='<p style="color:#7a8ba8;font-size:0.9em;margin-bottom:12px">Ranked strategies to improve your AUS outcome:</p>';
+  for(let s of scenarios){
+    html+='<div class="scenario-card">';
+    html+='<div class="sc-name">'+s.name+'</div>';
+    html+='<div class="sc-desc">'+s.desc+'</div>';
+    html+='<div class="sc-meta">Difficulty: '+s.difficulty+' &bull; Timeframe: '+s.time+'</div>';
+    html+='<div class="sc-impact impact-pos">Impact: '+s.impact+'</div>';
+    html+='</div>';
+  }
+  html+='</div>';
+
+  // Risk layering
+  html+='<div class="panel"><h2>RISK LAYERING ANALYSIS ('+layers.length+' Layers)</h2>';
+  let layerAssess=layers.length<=1?"Minimal risk layering - strong AUS position":layers.length===2?"Moderate risk layering - AUS will likely still approve with comp factors":layers.length===3?"Significant risk layering - AUS approval becomes difficult":layers.length===4?"Heavy risk layering - AUS will likely Refer":"Extreme risk layering - very low probability of automated approval";
+  html+='<p style="color:#93a3b8;margin-bottom:10px">'+layerAssess+'</p>';
+  for(let l of layers)html+='<div class="layer-item">'+l+'</div>';
+  html+='<p style="color:#60a5fa;margin-top:10px;font-size:0.88em">Target: reduce to '+(Math.max(0,layers.length-2))+' layers for optimal AUS treatment.</p>';
+  html+='</div>';
+
+  // Program comparison
+  html+='<div class="panel"><h2>AUS PROGRAM COMPARISON</h2>';
+  for(let i=0;i<programs.length;i++){
+    let p=programs[i];
+    let cls=p.eligible?"eligible":"ineligible";
+    let statusCls=p.eligible?"pg-elig":"pg-inelig";
+    let rank=p.eligible?(i+1):"-";
+    html+='<div class="program-card '+cls+'">';
+    html+='<span class="pg-status '+statusCls+'">'+(p.eligible?"ELIGIBLE #"+rank:"INELIGIBLE")+'</span>';
+    html+='<div class="pg-name">'+p.name+'</div>';
+    html+='<div class="pg-detail">Confidence: '+p.confidence+' | Max DTI: '+p.maxDTI+'% | Max LTV: '+p.maxLTV+'% | Min FICO: '+p.minFICO+'</div>';
+    if(p.rateAdj!==0)html+='<div class="pg-detail">Rate impact: '+(p.rateAdj>=0?"+":"")+p.rateAdj.toFixed(3)+'%</div>';
+    for(let a of p.advantages.slice(0,3))html+='<div class="pg-adv">+ '+a+'</div>';
+    for(let r of p.risks.slice(0,3))html+='<div class="pg-risk">! '+r+'</div>';
+    for(let t of p.tips.slice(0,2))html+='<div class="pg-tip">&rsaquo; '+t+'</div>';
+    html+='</div>';
+  }
+  html+='</div>';
+
+  // Guideline reference
+  html+='<div class="panel"><h2>GUIDELINE QUICK REFERENCE</h2><div class="two-col">';
+  html+='<div><h3>Conventional</h3><table class="guideline-table"><tr><td>Min FICO</td><td>620</td></tr><tr><td>Max DTI</td><td>50% (DU w/ comp factors)</td></tr><tr><td>Max LTV (Purchase Primary)</td><td>97%</td></tr><tr><td>Reserves (Primary)</td><td>0-2 months</td></tr><tr><td>Reserves (Investment)</td><td>6 months PITIA</td></tr><tr><td>BK Seasoning</td><td>48 mo (Ch 7) / 24 mo (Ch 13)</td></tr><tr><td>FC Seasoning</td><td>84 months</td></tr><tr><td>Seller Concessions</td><td>3% (&gt;90 LTV), 6% (75-90), 9% (&lt;75)</td></tr></table></div>';
+  html+='<div><h3>FHA</h3><table class="guideline-table"><tr><td>Min FICO</td><td>580 (3.5% dn) / 500 (10% dn)</td></tr><tr><td>Max DTI</td><td>57% w/ comp factors</td></tr><tr><td>Max LTV</td><td>96.5%</td></tr><tr><td>Upfront MIP</td><td>1.75%</td></tr><tr><td>Annual MIP</td><td>0.55%</td></tr><tr><td>BK Seasoning</td><td>24 mo (Ch 7) / 12 mo into Ch 13</td></tr><tr><td>FC Seasoning</td><td>36 months</td></tr><tr><td>Manual UW</td><td>Yes - if TOTAL Refers</td></tr></table></div>';
+  html+='<div><h3>VA</h3><table class="guideline-table"><tr><td>Min FICO</td><td>No VA min (lenders: 580-620)</td></tr><tr><td>Max DTI</td><td>No hard cap (residual income)</td></tr><tr><td>Max LTV</td><td>100%</td></tr><tr><td>Funding Fee</td><td>1.25-3.3%</td></tr><tr><td>PMI</td><td>NONE</td></tr><tr><td>BK Seasoning</td><td>24 months</td></tr><tr><td>FC Seasoning</td><td>24 months</td></tr></table></div>';
+  html+='<div><h3>Non-QM</h3><table class="guideline-table"><tr><td>Min FICO</td><td>600-660 (varies)</td></tr><tr><td>Max DTI</td><td>55%+</td></tr><tr><td>Programs</td><td>Bank stmt, DSCR, asset depletion</td></tr><tr><td>Best For</td><td>Self-employed, investors</td></tr><tr><td>Rates</td><td>1-3% higher than conventional</td></tr></table></div>';
+  html+='</div></div>';
+
+  // Final action plan
+  html+='<div class="panel" style="border-color:#00d4ff"><h2>FINAL ACTION PLAN</h2>';
+  html+='<div class="metrics-row">';
+  html+='<div class="metric-card"><div class="lbl">Status</div><div class="val" style="font-size:0.9em;color:'+(rec.includes("Approve")?"#34d399":"#fbbf24")+'">'+rec+'</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Score</div><div class="val '+scoreClass+'">'+scorePct.toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">Approval Prob</div><div class="val '+probClass+'">'+prob.toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">DTI</div><div class="val">'+(dtiF.backDTI).toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">LTV</div><div class="val">'+ltvF.ltv.toFixed(1)+'%</div></div>';
+  html+='<div class="metric-card"><div class="lbl">FICO</div><div class="val">'+d.creditScore+'</div></div>';
+  html+='</div>';
+  html+='<h3>Top Actions to Take</h3>';
+  let allActions=[];
+  for(let f of factors)for(let a of f.actions)allActions.push(a);
+  for(let i=0;i<Math.min(5,allActions.length);i++)html+='<div class="action-item" style="font-size:0.95em;padding:5px 0 5px 20px">'+(i+1)+'. '+allActions[i]+'</div>';
+  html+='<p style="text-align:center;color:#00d4ff;margin-top:20px;font-weight:600">Structure the deal, adjust inputs above, and re-analyze until Approve/Eligible.</p>';
+  html+='</div>';
+
+  document.getElementById('results').innerHTML=html;
+  document.getElementById('results').style.display='block';
+  document.getElementById('results').scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
